@@ -1,0 +1,5 @@
+# .gitignore
+/.env
+widrawals/stripe_pay_demo.php
+/vendor/
+*.log
