@@ -19,6 +19,7 @@ jobs:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
       IMAGE_TAG: latest
+      TF_VAR_db_password: ${{ secrets.TF_VAR_db_password }}
 
     steps:
       # --------------------
