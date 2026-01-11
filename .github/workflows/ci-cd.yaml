@@ -5,20 +5,31 @@ on:
     branches:
       - main
 
-env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-  IMAGE_TAG: ${{ github.sha }}
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   terraform-docker-deploy:
+    name: Provision Infra, Build & Deploy App
     runs-on: ubuntu-latest
 
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+      IMAGE_TAG: latest
+
     steps:
-      - name: Checkout repository
+      # --------------------
+      # Checkout repository
+      # --------------------
+      - name: Checkout code
         uses: actions/checkout@v4
 
+      # --------------------
+      # Configure AWS credentials
+      # --------------------
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -26,46 +37,71 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      # --------------------
+      # Install Terraform
+      # --------------------
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
 
+      # --------------------
+      # Terraform Init
+      # --------------------
       - name: Terraform Init
-        working-directory: ./terraform
+        working-directory: easybank-infra.tf
         run: terraform init
 
-      - name: Terraform Validate
-        working-directory: ./terraform
-        run: terraform validate
-
+      # --------------------
+      # Terraform Apply
+      # --------------------
       - name: Terraform Apply
-        working-directory: ./terraform
+        working-directory: easybank-infra.tf
         run: terraform apply -auto-approve
 
+      # --------------------
+      # Login to Amazon ECR
+      # --------------------
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION \
-          | docker login --username AWS --password-stdin \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+          | docker login \
+            --username AWS \
+            --password-stdin \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
+      # --------------------
+      # Build & Tag Docker Image
+      # --------------------
       - name: Build Docker image
         run: |
           docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REPOSITORY:$IMAGE_TAG \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Trivy Image Scan (CRITICAL/HIGH)
+      # --------------------
+      # Trivy Security Scan
+      # --------------------
+      - name: Trivy Scan Docker image
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          image-ref: $AWS_ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
           severity: CRITICAL,HIGH
           exit-code: 1
           format: table
 
+      # --------------------
+      # Push Image to ECR
+      # --------------------
       - name: Push Docker image to ECR
         run: |
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Deploy to ECS
+      # --------------------
+      # Deploy to ECS
+      # --------------------
+      - name: Deploy ECS Service
         run: |
           aws ecs update-service \
             --cluster ${{ secrets.ECS_CLUSTER }} \
