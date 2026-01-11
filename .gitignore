@@ -3,3 +3,6 @@
 widrawals/stripe_pay_demo.php
 /vendor/
 *.log
+*.tfstate
+*.tfvars
+.terraform/
