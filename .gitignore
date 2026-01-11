@@ -1,8 +1,15 @@
-# .gitignore
-/.env
-widrawals/stripe_pay_demo.php
-/vendor/
-*.log
+# Terraform
+**/.terraform/
 *.tfstate
-*.tfvars
-.terraform/
+*.tfstate.*
+*.backup
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Composer
+/vendor/
+
+# Logs
+*.log

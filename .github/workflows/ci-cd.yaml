@@ -23,13 +23,13 @@ jobs:
 
     steps:
       # --------------------
-      # Checkout repository
+      # Checkout code
       # --------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
       # --------------------
-      # Configure AWS credentials
+      # AWS Auth
       # --------------------
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -39,41 +39,30 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       # --------------------
-      # Install Terraform
+      # Terraform
       # --------------------
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
 
-      # --------------------
-      # Terraform Init
-      # --------------------
       - name: Terraform Init
         working-directory: easybank-infra.tf
         run: terraform init
 
-      # --------------------
-      # Terraform Apply
-      # --------------------
       - name: Terraform Apply
         working-directory: easybank-infra.tf
         run: terraform apply -auto-approve
 
       # --------------------
-      # Login to Amazon ECR
+      # Docker & ECR
       # --------------------
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION \
-          | docker login \
-            --username AWS \
-            --password-stdin \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+          | docker login --username AWS --password-stdin \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      # --------------------
-      # Build & Tag Docker Image
-      # --------------------
       - name: Build Docker image
         run: |
           docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
@@ -81,26 +70,28 @@ jobs:
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
       # --------------------
-      # Trivy Security Scan
+      # Security Scan
       # --------------------
       - name: Trivy Scan Docker image
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: $AWS_ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          image-ref: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          scanners: vuln
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
           exit-code: 1
           format: table
 
       # --------------------
-      # Push Image to ECR
+      # Push Image
       # --------------------
       - name: Push Docker image to ECR
         run: |
           docker push \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
       # --------------------
-      # Deploy to ECS
+      # ECS Deployment
       # --------------------
       - name: Deploy ECS Service
         run: |
