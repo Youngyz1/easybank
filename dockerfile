@@ -1,11 +1,5 @@
-FROM php:8.2-apache
-
-# Use the slim variant to reduce attack surface
-# e.g., php:8.2.12-apache-bullseye-slim (or the latest patch)
-# Slim images have fewer packages installed by default
-# and get security patches faster
-# Optional: pin a patch version for consistency
-# FROM php:8.2.12-apache-bullseye-slim
+# Use a patched slim variant for faster security updates
+FROM php:8.2-apache-bullseye-slim
 
 # Update OS packages and remove unnecessary packages
 RUN apt-get update && apt-get upgrade -y \
