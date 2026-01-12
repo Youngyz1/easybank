@@ -5,26 +5,28 @@ on:
     branches:
       - main
     paths:
-      - 'easybank-infra/**'
-      - 'Dockerfile'
-      - '**/*.php'
-      - 'assets/**'
+      - "easybank-infra/**"
+      - "Dockerfile"
+      - "**/*.php"
+      - "assets/**"
 
 permissions:
   contents: read
-  id-token: write
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
   ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-  IMAGE_TAG: latest
   TF_VAR_db_password: ${{ secrets.TF_VAR_db_password }}
 
+# ============================================================
+# Terraform Job
+# ============================================================
 jobs:
   terraform:
     name: Provision Infrastructure
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: easybank-infra
@@ -32,20 +34,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
 
-      - run: terraform init -input=false
-      - run: terraform plan -out=tfplan
-      - run: terraform apply -auto-approve tfplan
+      - name: Terraform Init
+        run: terraform init -input=false
 
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+# ============================================================
+# Application Job
+# ============================================================
   app:
     name: Build, Scan & Deploy App
     runs-on: ubuntu-latest
@@ -54,7 +66,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Set image tag from Git SHA
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -64,21 +80,22 @@ jobs:
         run: |
           aws ecr get-login-password --region $AWS_REGION \
           | docker login --username AWS --password-stdin \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      - name: Build Docker image
+      - name: Build Docker Image
         run: |
-          docker build \
-            -t $ECR_REPOSITORY:$IMAGE_TAG .
-
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REPOSITORY:$IMAGE_TAG \
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # 🔐 SECURITY SCAN (FAIL ONLY ON CRITICAL)
-      - name: Trivy Image Scan (CRITICAL only)
+      # --------------------------------------------------------
+      # 🔐 Trivy Image Scan (CRITICAL only)
+      # --------------------------------------------------------
+      - name: Trivy Image Scan (Fail on CRITICAL)
         uses: aquasecurity/trivy-action@0.20.0
         with:
           image-ref: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          scan-type: image
           scanners: vuln
           vuln-type: os,library
           severity: CRITICAL
@@ -86,10 +103,11 @@ jobs:
           exit-code: 1
           format: table
           skip-dirs: |
-            var/www/html/easybank-infra/.terraform
-            var/www/html/.terraform
+            easybank-infra/.terraform
+            .terraform
+          hide-progress: true
 
-      - name: Push Docker image to ECR
+      - name: Push Docker Image to ECR
         run: |
           docker push \
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG

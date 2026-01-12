@@ -1,0 +1,27 @@
+# Git
+.git
+.github
+
+# Terraform (CRITICAL)
+easybank-infra/.terraform
+easybank-infra/**/*.tfstate
+easybank-infra/**/*.tfplan
+
+# Composer / app deps
+vendor/
+node_modules
+
+# Docs & tests
+tests
+docs
+
+# CI
+Dockerfile
+docker-compose.yml
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
