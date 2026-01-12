@@ -92,7 +92,7 @@ resource "aws_ecs_task_definition" "easybank" {
 
   container_definitions = jsonencode([{
     name      = "easybank"
-    image     = var.easybank_image
+    image     = var.easybank_image  # <-- dynamic SHA-tagged image
     essential = true
 
     portMappings = [{
