@@ -1,6 +1,19 @@
 FROM php:8.2-apache
 
-# Enable Apache rewrite
+# Use the slim variant to reduce attack surface
+# e.g., php:8.2.12-apache-bullseye-slim (or the latest patch)
+# Slim images have fewer packages installed by default
+# and get security patches faster
+# Optional: pin a patch version for consistency
+# FROM php:8.2.12-apache-bullseye-slim
+
+# Update OS packages and remove unnecessary packages
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+       libzip-dev zip unzip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Enable Apache rewrite and allow overrides
 RUN a2enmod rewrite \
  && sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
@@ -13,4 +26,5 @@ COPY . /var/www/html/
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html
 
+# Default command
 CMD ["apache2-foreground"]
