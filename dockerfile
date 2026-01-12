@@ -1,5 +1,5 @@
-# Use a newer, patched slim base image
-FROM php:8.2-apache-bookworm-slim
+# Use a newer, patched slim base image (PHP 8.4)
+FROM php:8.4.16-apache-trixie
 
 # Install OS updates and required packages
 RUN apt-get update && \
@@ -22,10 +22,4 @@ RUN docker-php-ext-install pdo pdo_mysql
 COPY . /var/www/html/
 
 # Fix permissions
-RUN chown -R www-data:www-data /var/www/html
-
-# Drop root (Apache runs as www-data internally)
-USER www-data
-
-# Run Apache
-CMD ["apache2-foreground"]
+RUN chown -R www-data:www-data /
