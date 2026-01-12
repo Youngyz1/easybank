@@ -1,24 +1,32 @@
-# ======================
+# Git
+.git
+.gitignore
+.github
+
 # Terraform
-# ======================
-**/.terraform/
+**/.terraform
 *.tfstate
 *.tfstate.*
 *.backup
 *.tfplan
 
-# ======================
+# Composer
+vendor/
+
+# Node / frontend
+node_modules
+
+# Tests & docs
+tests
+docs
+
+# CI / configs
+docker-compose.yml
+Dockerfile
+
 # OS
-# ======================
 .DS_Store
 Thumbs.db
 
-# ======================
-# Composer
-# ======================
-/vendor/
-
-# ======================
 # Logs
-# ======================
 *.log

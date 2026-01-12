@@ -1,24 +1,31 @@
-# Use a patched slim variant for faster security updates
-FROM php:8.2-apache-bullseye-slim
+# Use a newer, patched slim base image
+FROM php:8.2-apache-bookworm-slim
 
-# Update OS packages and remove unnecessary packages
-RUN apt-get update && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends \
-       libzip-dev zip unzip \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install OS updates and required packages
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get dist-upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        libzip-dev \
+        zip \
+        unzip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Enable Apache rewrite and allow overrides
-RUN a2enmod rewrite \
- && sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
+# Enable only required Apache modules
+RUN a2enmod rewrite && \
+    sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql
 
-# Copy app files
+# Copy application files
 COPY . /var/www/html/
 
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html
 
-# Default command
+# Drop root (Apache runs as www-data internally)
+USER www-data
+
+# Run Apache
 CMD ["apache2-foreground"]
