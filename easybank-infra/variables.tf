@@ -1,14 +1,14 @@
 # ==========================================
-# AWS region
+# AWS Region
 # ==========================================
 variable "aws_region" {
-  description = "AWS region to deploy EasyBank"
+  description = "AWS region where EasyBank resources will be deployed"
   type        = string
   default     = "us-east-1"
 }
 
 # ==========================================
-# VPC CIDR block
+# VPC Configuration
 # ==========================================
 variable "vpc_cidr" {
   description = "CIDR block for the EasyBank VPC"
@@ -16,17 +16,14 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
-# ==========================================
-# Availability Zones
-# ==========================================
 variable "azs" {
-  description = "List of Availability Zones to use"
+  description = "List of Availability Zones to use for subnets"
   type        = list(string)
   default     = ["us-east-1a", "us-east-1b"]
 }
 
 # ==========================================
-# RDS Database password
+# RDS Database Configuration
 # ==========================================
 variable "db_password" {
   description = "RDS database password (sensitive)"
@@ -34,20 +31,38 @@ variable "db_password" {
   sensitive   = true
 }
 
+# Optional: database username
+variable "db_username" {
+  description = "RDS database master username"
+  type        = string
+  default     = "easybank_admin"
+}
+
 # ==========================================
-# ECS Docker image (full URI, Git SHA tagged)
+# ECS / Docker Image
 # ==========================================
 variable "easybank_image" {
   description = "Full ECS Docker image URI (Git SHA tagged)"
   type        = string
-  sensitive   = false
+}
+
+variable "image_tag" {
+  description = "Docker image tag (Git SHA or 'latest')"
+  type        = string
+  default     = "latest"
 }
 
 # ==========================================
-# Optional: pass image tag dynamically (CI/CD)
+# Optional: ECS cluster and service names
 # ==========================================
-variable "image_tag" {
-  description = "Docker image tag (usually Git SHA). Can be overridden by CI/CD."
+variable "ecs_cluster_name" {
+  description = "ECS Cluster name for EasyBank"
   type        = string
-  default     = "latest"
+  default     = "easybank-cluster"
+}
+
+variable "ecs_service_name" {
+  description = "ECS Service name for EasyBank"
+  type        = string
+  default     = "easybank-service"
 }

@@ -1,10 +1,13 @@
-# Use a newer, patched slim base image (PHP 8.4)
+# ============================================================
+# EasyBank Dockerfile
+# ============================================================
+
+# Use latest patched PHP 8.4 on Debian Trixie
 FROM php:8.4.16-apache-trixie
 
 # Install OS updates and required packages
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get dist-upgrade -y && \
     apt-get install -y --no-install-recommends \
         libzip-dev \
         zip \
@@ -18,14 +21,8 @@ RUN a2enmod rewrite && \
 # Install PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql
 
-# Copy application files
-COPY . /var/www/html/
+# Copy application files and fix permissions
+COPY --chown=www-data:www-data . /var/www/html/
 
-# Fix permissions
-RUN chown -R www-data:www-data /var/www/html
-
-# Drop root (Apache runs as www-data internally)
-USER www-data
-
-# Run Apache
-CMD ["apache2-foreground"]
+# Drop root user for security
+USE
