@@ -25,4 +25,7 @@ RUN docker-php-ext-install pdo pdo_mysql
 COPY --chown=www-data:www-data . /var/www/html/
 
 # Drop root user for security
-USE
+USER www-data
+
+# Run Apache in foreground
+CMD ["apache2-foreground"]
