@@ -20,8 +20,6 @@
  *
  */
 
-
-<?php
 session_start();
 
 require_once('__SRC__/secure_data.php'); // your existing input sanitization
