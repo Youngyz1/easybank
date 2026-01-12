@@ -38,6 +38,14 @@ variable "db_password" {
 # ECS Docker image
 # ==========================================
 variable "easybank_image" {
-  default = "958421185668.dkr.ecr.us-east-1.amazonaws.com/easybank:latest"
+  description = "ECS Docker image for EasyBank (Git SHA tagged)"
+  type        = string
+  default     = "958421185668.dkr.ecr.us-east-1.amazonaws.com/easybank:${var.image_tag}"
 }
 
+# Optional: pass image tag dynamically (from CI/CD)
+variable "image_tag" {
+  description = "Docker image tag (usually Git SHA)"
+  type        = string
+  default     = "latest"  # CI/CD will override with Git SHA
+}
