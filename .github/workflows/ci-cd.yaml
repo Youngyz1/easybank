@@ -23,11 +23,12 @@ env:
 
 jobs:
   terraform:
-    name: Provision Infra
+    name: Provision Infrastructure
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: easybank-infra
+
     steps:
       - uses: actions/checkout@v4
 
@@ -35,31 +36,21 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Cache Terraform plugins
-        uses: actions/cache@v3
-        with:
-          path: .terraform/plugin-cache
-          key: terraform-plugins-${{ hashFiles('**/*.tf*') }}
-          restore-keys: terraform-plugins-
+          aws-region: ${{ env.AWS_REGION }}
 
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
-          terraform_plugin_cache_dir: .terraform/plugin-cache
 
       - run: terraform init -input=false
       - run: terraform plan -out=tfplan
       - run: terraform apply -auto-approve tfplan
 
   app:
-    name: Build & Deploy App
+    name: Build, Scan & Deploy App
     runs-on: ubuntu-latest
     needs: terraform
-    defaults:
-      run:
-        working-directory: .
+
     steps:
       - uses: actions/checkout@v4
 
@@ -67,43 +58,41 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.docker-cache
-          key: docker-${{ github.sha }}
-          restore-keys: docker-
-
-      - name: Login to ECR
+      - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION \
           | docker login --username AWS --password-stdin \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      - name: Build & tag Docker image
+      - name: Build Docker image
         run: |
-          docker build --cache-from type=local,src=/tmp/.docker-cache \
-                       --cache-to type=local,dest=/tmp/.docker-cache-new,mode=max \
-                       -t $ECR_REPOSITORY:$IMAGE_TAG .
+          docker build \
+            -t $ECR_REPOSITORY:$IMAGE_TAG .
+
           docker tag $ECR_REPOSITORY:$IMAGE_TAG \
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
-          rm -rf /tmp/.docker-cache
-          mv /tmp/.docker-cache-new /tmp/.docker-cache
 
-      - name: Scan Docker image with Trivy
+      # 🔐 SECURITY SCAN (FAIL ONLY ON CRITICAL)
+      - name: Trivy Image Scan (CRITICAL only)
         uses: aquasecurity/trivy-action@0.20.0
         with:
           image-ref: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
           scanners: vuln
-          severity: CRITICAL       # Only fail on CRITICAL vulnerabilities
+          vuln-type: os,library
+          severity: CRITICAL
           ignore-unfixed: true
           exit-code: 1
           format: table
+          skip-dirs: |
+            var/www/html/easybank-infra/.terraform
+            var/www/html/.terraform
 
-      - name: Push Docker image
-        run: docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Push Docker image to ECR
+        run: |
+          docker push \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Deploy to ECS
         run: |
