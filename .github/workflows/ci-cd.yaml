@@ -76,12 +76,14 @@ jobs:
           key: docker-${{ github.sha }}
           restore-keys: docker-
 
-      - run: |
+      - name: Login to ECR
+        run: |
           aws ecr get-login-password --region $AWS_REGION \
           | docker login --username AWS --password-stdin \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      - run: |
+      - name: Build & tag Docker image
+        run: |
           docker build --cache-from type=local,src=/tmp/.docker-cache \
                        --cache-to type=local,dest=/tmp/.docker-cache-new,mode=max \
                        -t $ECR_REPOSITORY:$IMAGE_TAG .
@@ -90,7 +92,8 @@ jobs:
           rm -rf /tmp/.docker-cache
           mv /tmp/.docker-cache-new /tmp/.docker-cache
 
-      - uses: aquasecurity/trivy-action@0.20.0
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@0.20.0
         with:
           image-ref: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
           scanners: vuln
@@ -99,9 +102,11 @@ jobs:
           exit-code: 1
           format: table
 
-      - run: docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Push Docker image
+        run: docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - run: |
+      - name: Deploy to ECS
+        run: |
           aws ecs update-service \
             --cluster ${{ secrets.ECS_CLUSTER }} \
             --service ${{ secrets.ECS_SERVICE }} \
