@@ -53,19 +53,10 @@ jobs:
           | docker login --username AWS --password-stdin \
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      - name: Ensure ECR repository exists
-        run: |
-          aws ecr describe-repositories --repository-names $ECR_REPOSITORY \
-          || aws ecr create-repository --repository-name $ECR_REPOSITORY
-
-      # 🔥 CRITICAL FIX: Force Buildx as default builder
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
           install: true
-
-      - name: Verify Buildx
-        run: docker buildx ls
 
       - name: Build & Push Docker Image with ECR cache
         run: |
@@ -74,6 +65,8 @@ jobs:
 
           docker buildx build \
             --platform linux/amd64 \
+            --pull \
+            --progress=plain \
             --cache-from type=registry,ref=$IMAGE_URI:$CACHE_TAG \
             --cache-to type=registry,ref=$IMAGE_URI:$CACHE_TAG,mode=max \
             -t $IMAGE_URI:$IMAGE_TAG \
@@ -125,8 +118,10 @@ jobs:
           EASYBANK_IMAGE=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:$IMAGE_TAG
           echo "EASYBANK_IMAGE=$EASYBANK_IMAGE" >> $GITHUB_ENV
 
-      - name: Terraform Init
-        run: terraform init -input=false
+      - name: Terraform Init & Validate
+        run: |
+          terraform init -input=false
+          terraform validate
 
       - name: Terraform Plan
         run: terraform plan -out=tfplan -var="easybank_image=$EASYBANK_IMAGE"
