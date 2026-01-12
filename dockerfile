@@ -22,4 +22,10 @@ RUN docker-php-ext-install pdo pdo_mysql
 COPY . /var/www/html/
 
 # Fix permissions
-RUN chown -R www-data:www-data /
+RUN chown -R www-data:www-data /var/www/html
+
+# Drop root (Apache runs as www-data internally)
+USER www-data
+
+# Run Apache
+CMD ["apache2-foreground"]
