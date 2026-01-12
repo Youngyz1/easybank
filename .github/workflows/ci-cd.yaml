@@ -27,7 +27,7 @@ jobs:
     name: Build, Scan & Push Docker Image
     runs-on: ubuntu-latest
     outputs:
-      IMAGE_TAG: ${{ steps.set-sha.outputs.IMAGE_TAG }}   # <-- set output
+      IMAGE_TAG: ${{ steps.set-sha.outputs.IMAGE_TAG }}
 
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
       - name: Trivy Image Scan (Fail on CRITICAL)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          image-ref: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
           scan-type: image
           scanners: vuln
           vuln-type: os,library
@@ -83,7 +83,7 @@ jobs:
   terraform:
     name: Provision Infrastructure
     runs-on: ubuntu-latest
-    needs: build-app  # <-- wait for Docker build
+    needs: build-app
 
     defaults:
       run:
@@ -104,9 +104,11 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      - name: Set EASYBANK_IMAGE from build-app output
+      - name: Set EASYBANK_IMAGE for Terraform
         run: |
-          echo "EASYBANK_IMAGE=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ needs.build-app.outputs.IMAGE_TAG }}" >> $GITHUB_ENV
+          IMAGE_TAG=${{ needs.build-app.outputs.IMAGE_TAG }}
+          EASYBANK_IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
+          echo "EASYBANK_IMAGE=$EASYBANK_IMAGE" >> $GITHUB_ENV
 
       - name: Terraform Init
         run: terraform init -input=false
