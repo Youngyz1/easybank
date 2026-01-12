@@ -21,7 +21,7 @@ env:
 
 jobs:
   # ============================================================
-  # Build, Scan & Push Docker Image
+  # Build, Scan & Push Docker Image using ECR cache
   # ============================================================
   build-app:
     name: Build, Scan & Push Docker Image
@@ -51,26 +51,23 @@ jobs:
           | docker login --username AWS --password-stdin \
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.docker-cache
-          key: docker-${{ github.sha }}
-          restore-keys: docker-
-
-      - name: Build Docker Image
+      - name: Build Docker Image with ECR cache
         run: |
-          docker build --cache-from type=local,src=/tmp/.docker-cache \
-                       --cache-to type=local,dest=/tmp/.docker-cache-new,mode=max \
+          IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY
+          CACHE_TAG=cache
+
+          # Build using cache from ECR
+          docker build --cache-from $IMAGE_URI:$CACHE_TAG \
                        -t $ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
-          mv /tmp/.docker-cache-new /tmp/.docker-cache
+
+          # Tag for ECR
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $IMAGE_URI:$IMAGE_TAG
 
       - name: Trivy Image Scan (Fail on CRITICAL)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          image-ref: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          scan-type: image
           scanners: vuln
           vuln-type: os,library
           severity: CRITICAL
@@ -81,10 +78,17 @@ jobs:
 
       - name: Push Docker Image to ECR
         run: |
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY
+          docker push $IMAGE_URI:$IMAGE_TAG
+
+      - name: Update ECR cache image
+        run: |
+          IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $IMAGE_URI:cache
+          docker push $IMAGE_URI:cache
 
   # ============================================================
-  # Terraform Job: Provision Infrastructure
+  # Terraform Job: Provision Infrastructure using SHA-tagged image
   # ============================================================
   terraform:
     name: Provision Infrastructure
