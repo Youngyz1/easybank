@@ -21,9 +21,9 @@ env:
 
 jobs:
   # ============================================================
-  # Job 1: Provision Base Infrastructure (including ECR)
+  # Job 1: Provision Base Infrastructure (ECR included)
   # ============================================================
-  terraform:
+  terraform-base:
     name: Provision Base Infrastructure
     runs-on: ubuntu-latest
     outputs:
@@ -67,7 +67,7 @@ jobs:
   build-and-deploy:
     name: Build Docker Image & Deploy ECS
     runs-on: ubuntu-latest
-    needs: terraform
+    needs: terraform-base
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -89,7 +89,7 @@ jobs:
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION \
-          | docker login --username AWS --password-stdin ${{ needs.terraform.outputs.ECR_URI }}
+          | docker login --username AWS --password-stdin ${{ needs.terraform-base.outputs.ECR_URI }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -98,7 +98,7 @@ jobs:
 
       - name: Build & Push Docker Image
         run: |
-          IMAGE_URI=${{ needs.terraform.outputs.ECR_URI }}
+          IMAGE_URI=${{ needs.terraform-base.outputs.ECR_URI }}
           CACHE_TAG=cache
           docker buildx build \
             --platform linux/amd64 \
@@ -112,7 +112,7 @@ jobs:
       - name: Trivy Image Scan (Fail on CRITICAL)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: ${{ needs.terraform.outputs.ECR_URI }}:${{ steps.set-sha.outputs.IMAGE_TAG }}
+          image-ref: ${{ needs.terraform-base.outputs.ECR_URI }}:${{ steps.set-sha.outputs.IMAGE_TAG }}
           scan-type: image
           scanners: vuln
           vuln-type: os,library
@@ -124,8 +124,8 @@ jobs:
 
       - name: Deploy ECS with new image
         run: |
+          EASYBANK_IMAGE=${{ needs.terraform-base.outputs.ECR_URI }}:${{ steps.set-sha.outputs.IMAGE_TAG }}
           terraform init -input=false
           terraform validate
-          terraform plan -out=tfplan \
-            -var="easybank_image=${{ needs.terraform.outputs.ECR_URI }}:${{ steps.set-sha.outputs.IMAGE_TAG }}"
+          terraform plan -out=tfplan -var="easybank_image=$EASYBANK_IMAGE"
           terraform apply -auto-approve tfplan
