@@ -11,7 +11,7 @@ resource "aws_cloudwatch_log_group" "easybank" {
 }
 
 # ==========================================
-# ECS Task Execution IAM Role (ECS internal use)
+# ECS Task Execution IAM Role (internal use)
 # ==========================================
 resource "aws_iam_role" "ecs_task_execution" {
   name = "ecsTaskExecutionRole"
@@ -37,7 +37,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_ecr_access" {
 }
 
 # ==========================================
-# ECS Task Role (App role, e.g., SES)
+# ECS Task Role (app role, e.g., SES)
 # ==========================================
 resource "aws_iam_role" "ecs_task_role" {
   name = "easybank-task-role"
@@ -59,16 +59,11 @@ resource "aws_iam_policy" "ecs_ses_send_email" {
 
   policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [
-      {
-        Effect   = "Allow",
-        Action   = [
-          "ses:SendEmail",
-          "ses:SendRawEmail"
-        ],
-        Resource = "*"  # optionally restrict to your verified SES identities
-      }
-    ]
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ses:SendEmail", "ses:SendRawEmail"]
+      Resource = "*"
+    }]
   })
 }
 
@@ -92,11 +87,11 @@ resource "aws_ecs_task_definition" "easybank" {
 
   container_definitions = jsonencode([{
     name      = "easybank"
-    image     = var.easybank_image  # <-- dynamic SHA-tagged image
+    image     = var.easybank_image
     essential = true
 
     portMappings = [{
-      containerPort = 80
+      containerPort = 8080
       protocol      = "tcp"
     }]
 
@@ -121,16 +116,18 @@ resource "aws_ecs_service" "easybank" {
   desired_count   = 2
   launch_type     = "FARGATE"
 
+  force_new_deployment = true 
+
   network_configuration {
-    subnets          = aws_subnet.app[*].id
-    security_groups  = [aws_security_group.app_sg.id]
+    subnets          = var.app_subnet_ids
+    security_groups  = [var.app_sg_id]
     assign_public_ip = false
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.easybank.arn
+    target_group_arn = "arn:aws:elasticloadbalancing:us-east-1:958421185668:targetgroup/easybank-tg/a573029dbbaf0aa0"
     container_name   = "easybank"
-    container_port   = 80
+    container_port   = 8080
   }
 
   depends_on = [aws_lb_listener.easybank]

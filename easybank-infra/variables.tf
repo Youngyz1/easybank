@@ -46,11 +46,6 @@ variable "easybank_image" {
   type        = string
 }
 
-variable "image_tag" {
-  description = "Docker image tag (Git SHA or 'latest')"
-  type        = string
-  default     = "latest"
-}
 
 # ==========================================
 # Optional: ECS cluster and service names
@@ -65,4 +60,23 @@ variable "ecs_service_name" {
   description = "ECS Service name for EasyBank"
   type        = string
   default     = "easybank-service"
+}
+
+# ==========================================
+# ECS input variables
+# ==========================================
+
+variable "app_subnet_ids" {
+  description = "List of subnet IDs for the ECS tasks (app subnets)"
+  type        = list(string)
+}
+
+variable "app_sg_id" {
+  description = "Security Group ID for ECS tasks"
+  type        = string
+}
+
+variable "lb_target_group_arn" {
+  description = "ARN of the existing ALB target group"
+  type        = string
 }

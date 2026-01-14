@@ -19,7 +19,7 @@ resource "aws_lb" "easybank" {
 # ==========================================
 resource "aws_lb_target_group" "easybank" {
   name        = "easybank-tg"
-  port        = 80
+  port        = 8080
   protocol    = "HTTP"
   vpc_id      = aws_vpc.easybank.id
   target_type = "ip"  # Required for Fargate
@@ -27,7 +27,7 @@ resource "aws_lb_target_group" "easybank" {
   health_check {
     interval            = 30
     path                = "/"
-    port                = "80"
+    port                = "8080"
     protocol            = "HTTP"
     timeout             = 5
     healthy_threshold   = 2
