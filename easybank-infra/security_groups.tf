@@ -43,12 +43,12 @@ resource "aws_security_group" "app_sg" {
   vpc_id      = aws_vpc.easybank.id
 
   # Allow outbound to internet
-  egress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+   egress {
+   from_port   = 0
+   to_port     = 0
+   protocol    = "-1"
+   cidr_blocks = ["0.0.0.0/0"]
+ }
 
   tags = {
     Name = "easybank-app-sg"
@@ -83,8 +83,8 @@ resource "aws_security_group" "rds_sg" {
 # ALB → App (ingress)
 resource "aws_security_group_rule" "alb_to_app" {
   type                     = "ingress"
-  from_port                = 80
-  to_port                  = 80
+  from_port                = 8080
+  to_port                  = 8080
   protocol                 = "tcp"
   security_group_id        = aws_security_group.app_sg.id
   source_security_group_id = aws_security_group.alb_sg.id
