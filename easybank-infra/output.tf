@@ -30,11 +30,6 @@ output "db_port" {
   value = aws_db_instance.easybank.port
 }
 
-resource "aws_ecr_repository" "easybank" {
-  name                 = "easybank"
-  image_tag_mutability = "MUTABLE"
-}
-
 output "easybank_ecr_url" {
   value = aws_ecr_repository.easybank.repository_url
 }
