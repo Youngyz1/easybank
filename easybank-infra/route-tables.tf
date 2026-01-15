@@ -25,7 +25,7 @@ resource "aws_route_table_association" "public" {
 # Private / App Route Tables (one per private subnet)
 # ==========================================
 resource "aws_route_table" "private" {
-  for_each = {for i, s in aws_subnet.app : i => s}
+  for_each = { for i, s in aws_subnet.app : i => s }
 
   vpc_id = aws_vpc.easybank.id
 
@@ -41,7 +41,7 @@ resource "aws_route_table" "private" {
 
 # Associate private RT with private subnets
 resource "aws_route_table_association" "private" {
-  for_each      = {for i, s in aws_subnet.app : i => s}
+  for_each       = { for i, s in aws_subnet.app : i => s }
   subnet_id      = each.value.id
   route_table_id = aws_route_table.private[each.key].id
 }
