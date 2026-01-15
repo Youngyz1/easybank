@@ -86,25 +86,30 @@ resource "aws_ecs_task_definition" "easybank" {
   task_role_arn      = aws_iam_role.ecs_task_role.arn
 
   container_definitions = jsonencode([{
-    name      = "easybank"
-    image     = var.easybank_image
-    essential = true
+  name      = "easybank"
+  image     = var.easybank_image
+  essential = true
 
-    portMappings = [{
-      containerPort = 8080
-      protocol      = "tcp"
-    }]
+  portMappings = [{
+    containerPort = 8080
+    protocol      = "tcp"
+  }]
 
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        awslogs-group         = "/ecs/easybank"
-        awslogs-region        = var.aws_region
-        awslogs-stream-prefix = "ecs"
-      }
+  logConfiguration = {
+    logDriver = "awslogs"
+    options = {
+      awslogs-group         = "/ecs/easybank"
+      awslogs-region        = var.aws_region
+      awslogs-stream-prefix = "ecs"
     }
-  }])
-}
+  }
+
+  # Inject secrets as environment variables (remove from Dockerfile)
+  environment = [
+    { name = "STRIPE_SECRET", value = var.stripe_secret },
+    { name = "STRIPE_PUBLIC", value = var.stripe_public }
+  ]
+}])
 
 # ==========================================
 # ECS Service

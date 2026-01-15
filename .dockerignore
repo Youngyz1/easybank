@@ -1,27 +1,22 @@
-# Git
+# Ignore Git & CI/CD
 .git
 .github
 
-# Terraform (CRITICAL)
-easybank-infra/.terraform
-easybank-infra/**/*.tfstate
-easybank-infra/**/*.tfplan
+# Terraform
+easybank-infra/
+*.tfstate
+*.tfplan
 
-# Composer / app deps
+# Composer / vendor / node
 vendor/
-node_modules
+node_modules/
 
-# Docs & tests
-tests
-docs
-
-# CI
-Dockerfile
-docker-compose.yml
-
-# OS junk
+# Logs / tmp / OS junk
+*.log
+__TMP__/
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
+# Secrets
+.env
+widrawals/stripe_*.php

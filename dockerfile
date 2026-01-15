@@ -21,13 +21,21 @@ RUN sed -i 's/80/8080/' /etc/apache2/ports.conf && \
 # Install PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql
 
-# Copy application files
-COPY . /var/www/html/
+# Copy only app files (excluding secrets)
+COPY __ROOT__/ /var/www/html/
+COPY __SRC__/ /var/www/html/__SRC__/
+COPY assets/ /var/www/html/assets/
+COPY mail/ /var/www/html/mail/
+COPY fpdf/ /var/www/html/fpdf/
+COPY widrawals/ /var/www/html/widrawals/
+COPY images/ /var/www/html/images/
+COPY *.php /var/www/html/
+COPY composer.json composer.lock /var/www/html/
 
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html
 
-# Drop root (Apache runs as www-data internally)
+# Drop root
 USER www-data
 
 # Expose port 8080
