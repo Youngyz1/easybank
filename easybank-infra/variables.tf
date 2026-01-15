@@ -72,3 +72,15 @@ variable "lb_target_group_arn" {
   description = "ARN of the existing ALB target group"
   type        = string
 }
+
+variable "stripe_secret" {
+  description = "Stripe secret key (passed via CI/CD)"
+  type        = string
+  sensitive   = true
+}
+
+variable "stripe_public" {
+  description = "Stripe public key (passed via CI/CD)"
+  type        = string
+  sensitive   = true
+}
