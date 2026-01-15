@@ -116,19 +116,21 @@ resource "aws_ecs_service" "easybank" {
   desired_count   = 2
   launch_type     = "FARGATE"
 
-  force_new_deployment = true 
+  force_new_deployment = true
 
   network_configuration {
-    subnets          = var.app_subnet_ids
-    security_groups  = [var.app_sg_id]
+    subnets          = aws_subnet.app[*].id
+    security_groups  = [aws_security_group.app_sg.id]
     assign_public_ip = false
   }
 
+
   load_balancer {
-    target_group_arn = "arn:aws:elasticloadbalancing:us-east-1:958421185668:targetgroup/easybank-tg/a573029dbbaf0aa0"
+    target_group_arn = aws_lb_target_group.easybank.arn
     container_name   = "easybank"
     container_port   = 8080
   }
 
-  depends_on = [aws_lb_listener.easybank]
+
+
 }

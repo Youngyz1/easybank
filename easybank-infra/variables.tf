@@ -67,15 +67,6 @@ variable "ecs_service_name" {
 # ECS input variables
 # ==========================================
 
-variable "app_subnet_ids" {
-  description = "List of subnet IDs for the ECS tasks (app subnets)"
-  type        = list(string)
-}
-
-variable "app_sg_id" {
-  description = "Security Group ID for ECS tasks"
-  type        = string
-}
 
 variable "lb_target_group_arn" {
   description = "ARN of the existing ALB target group"
