@@ -22,11 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       ECR_URI: ${{ steps.get-ecr.outputs.ECR_URI }}
-
     defaults:
       run:
         working-directory: easybank-infra
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -52,8 +50,8 @@ jobs:
       - name: Get ECR Repository URI
         id: get-ecr
         run: |
-          ECR_URI=$(terraform output -raw easybank_ecr_url)
-          echo "ECR_URI=$ECR_URI" >> $GITHUB_OUTPUT
+          REPO_URI=$(terraform output -raw easybank_ecr_url)
+          echo "ECR_URI=$REPO_URI" >> $GITHUB_OUTPUT
 
 # ============================================================
 # JOB 2: BUILD & PUSH DOCKER IMAGE
@@ -64,7 +62,6 @@ jobs:
     needs: terraform-base
     outputs:
       IMAGE_TAG: ${{ steps.image-tag.outputs.IMAGE_TAG }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -82,18 +79,27 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Debug ECR URI and Tag
+        run: |
+          echo "ECR URI: ${{ needs.terraform-base.outputs.ECR_URI }}"
+          echo "Image Tag: ${{ steps.image-tag.outputs.IMAGE_TAG }}"
+
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | \
           docker login --username AWS --password-stdin \
-          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+          ${{ needs.terraform-base.outputs.ECR_URI }}
 
       - name: Build & Push Docker Image
         run: |
-          docker build \
-            -t ${{ needs.terraform-base.outputs.ECR_URI }}:${{ steps.image-tag.outputs.IMAGE_TAG }} .
-          docker push \
-            ${{ needs.terraform-base.outputs.ECR_URI }}:${{ steps.image-tag.outputs.IMAGE_TAG }}
+          IMAGE_URI=${{ needs.terraform-base.outputs.ECR_URI }}
+          IMAGE_TAG=${{ steps.image-tag.outputs.IMAGE_TAG }}
+          if [[ -z "$IMAGE_URI" ]]; then
+            echo "ERROR: ECR URI is empty. Docker tag would be invalid."
+            exit 1
+          fi
+          docker build -t $IMAGE_URI:$IMAGE_TAG .
+          docker push $IMAGE_URI:$IMAGE_TAG
 
       - name: Trivy Image Scan (Fail on CRITICAL)
         uses: aquasecurity/trivy-action@0.20.0
@@ -112,11 +118,9 @@ jobs:
     name: Deploy ECS with New Image
     runs-on: ubuntu-latest
     needs: build-image
-
     defaults:
       run:
         working-directory: easybank-infra
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -138,7 +142,5 @@ jobs:
           IMAGE_URI=${{ needs.terraform-base.outputs.ECR_URI }}:${{ needs.build-image.outputs.IMAGE_TAG }}
           terraform init -input=false
           terraform validate
-          terraform plan \
-            -var="easybank_image=$IMAGE_URI" \
-            -out=tfplan
+          terraform plan -var="easybank_image=$IMAGE_URI" -out=tfplan
           terraform apply -auto-approve tfplan
