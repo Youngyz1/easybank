@@ -15,13 +15,11 @@ env:
 
 jobs:
 # ============================================================
-# JOB 1: BASE INFRA (NO APP IMAGE DEPENDENCY)
+# JOB 1: BASE INFRA (VPC, ALB, RDS, ECS, ECR)
 # ============================================================
   terraform-base:
     name: Provision Base Infrastructure
     runs-on: ubuntu-latest
-    outputs:
-      ECR_URI: ${{ steps.get-ecr.outputs.ECR_URI }}
     defaults:
       run:
         working-directory: easybank-infra
@@ -41,17 +39,11 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      - name: Terraform Init / Validate / Apply (Base Infra)
+      - name: Terraform Init / Validate / Apply
         run: |
           terraform init -input=false
           terraform validate
           terraform apply -auto-approve
-
-      - name: Get ECR Repository URI
-        id: get-ecr
-        run: |
-          REPO_URI=$(terraform output -raw easybank_ecr_url)
-          echo "ECR_URI=$REPO_URI" >> $GITHUB_OUTPUT
 
 # ============================================================
 # JOB 2: BUILD & PUSH DOCKER IMAGE
@@ -79,12 +71,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Debug ECR URI and Tag
+      - name: Set ECR Repository URI (deterministic)
         run: |
-          echo "ECR URI: ${{ needs.terraform-base.outputs.ECR_URI }}"
-          echo "Image Tag: ${{ steps.image-tag.outputs.IMAGE_TAG }}"
+          ECR_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/easybank"
+          echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
+          echo "Using ECR repo: $ECR_URI"
 
-      # ✅ FIXED ECR LOGIN
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | \
@@ -93,21 +85,14 @@ jobs:
 
       - name: Build & Push Docker Image
         run: |
-          IMAGE_URI=${{ needs.terraform-base.outputs.ECR_URI }}
-          IMAGE_TAG=${{ steps.image-tag.outputs.IMAGE_TAG }}
-
-          if [[ -z "$IMAGE_URI" ]]; then
-            echo "ERROR: ECR URI is empty."
-            exit 1
-          fi
-
-          docker build -t $IMAGE_URI:$IMAGE_TAG .
-          docker push $IMAGE_URI:$IMAGE_TAG
+          IMAGE_URI="$ECR_URI:$IMAGE_TAG"
+          docker build -t $IMAGE_URI .
+          docker push $IMAGE_URI
 
       - name: Trivy Image Scan (Fail on CRITICAL)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: ${{ needs.terraform-base.outputs.ECR_URI }}:${{ steps.image-tag.outputs.IMAGE_TAG }}
+          image-ref: ${{ env.ECR_URI }}:${{ steps.image-tag.outputs.IMAGE_TAG }}
           scan-type: image
           severity: CRITICAL
           exit-code: 1
@@ -142,7 +127,7 @@ jobs:
 
       - name: Deploy ECS with Git SHA Image
         run: |
-          IMAGE_URI=${{ needs.terraform-base.outputs.ECR_URI }}:${{ needs.build-image.outputs.IMAGE_TAG }}
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/easybank:${{ needs.build-image.outputs.IMAGE_TAG }}"
           terraform init -input=false
           terraform validate
           terraform plan -var="easybank_image=$IMAGE_URI" -out=tfplan
