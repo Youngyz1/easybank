@@ -84,20 +84,23 @@ jobs:
           echo "ECR URI: ${{ needs.terraform-base.outputs.ECR_URI }}"
           echo "Image Tag: ${{ steps.image-tag.outputs.IMAGE_TAG }}"
 
+      # ✅ FIXED ECR LOGIN
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | \
           docker login --username AWS --password-stdin \
-          ${{ needs.terraform-base.outputs.ECR_URI }}
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
       - name: Build & Push Docker Image
         run: |
           IMAGE_URI=${{ needs.terraform-base.outputs.ECR_URI }}
           IMAGE_TAG=${{ steps.image-tag.outputs.IMAGE_TAG }}
+
           if [[ -z "$IMAGE_URI" ]]; then
-            echo "ERROR: ECR URI is empty. Docker tag would be invalid."
+            echo "ERROR: ECR URI is empty."
             exit 1
           fi
+
           docker build -t $IMAGE_URI:$IMAGE_TAG .
           docker push $IMAGE_URI:$IMAGE_TAG
 
