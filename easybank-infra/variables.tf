@@ -44,6 +44,7 @@ variable "db_username" {
 variable "easybank_image" {
   description = "Full ECS Docker image URI (Git SHA tagged)"
   type        = string
+  default     = "public.ecr.aws/nginx/nginx:latest"
 }
 
 
