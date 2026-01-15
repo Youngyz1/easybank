@@ -18,11 +18,13 @@ resource "aws_iam_role" "ecs_task_execution" {
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [{
-      Effect    = "Allow"
-      Action    = "sts:AssumeRole"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-    }]
+    Statement = [
+      {
+        Effect    = "Allow"
+        Action    = "sts:AssumeRole"
+        Principal = { Service = "ecs-tasks.amazonaws.com" }
+      }
+    ]
   })
 }
 
@@ -44,11 +46,13 @@ resource "aws_iam_role" "ecs_task_role" {
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [{
-      Effect    = "Allow"
-      Action    = "sts:AssumeRole"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-    }]
+    Statement = [
+      {
+        Effect    = "Allow"
+        Action    = "sts:AssumeRole"
+        Principal = { Service = "ecs-tasks.amazonaws.com" }
+      }
+    ]
   })
 }
 
@@ -59,11 +63,13 @@ resource "aws_iam_policy" "ecs_ses_send_email" {
 
   policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["ses:SendEmail", "ses:SendRawEmail"]
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ses:SendEmail", "ses:SendRawEmail"]
+        Resource = "*"
+      }
+    ]
   })
 }
 
@@ -85,31 +91,35 @@ resource "aws_ecs_task_definition" "easybank" {
   execution_role_arn = aws_iam_role.ecs_task_execution.arn
   task_role_arn      = aws_iam_role.ecs_task_role.arn
 
-  container_definitions = jsonencode([{
-  name      = "easybank"
-  image     = var.easybank_image
-  essential = true
+  container_definitions = jsonencode([
+    {
+      name      = "easybank"
+      image     = var.easybank_image
+      essential = true
 
-  portMappings = [{
-    containerPort = 8080
-    protocol      = "tcp"
-  }]
+      portMappings = [
+        {
+          containerPort = 8080
+          protocol      = "tcp"
+        }
+      ]
 
-  logConfiguration = {
-    logDriver = "awslogs"
-    options = {
-      awslogs-group         = "/ecs/easybank"
-      awslogs-region        = var.aws_region
-      awslogs-stream-prefix = "ecs"
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/easybank"
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+
+      environment = [
+        { name = "STRIPE_SECRET", value = var.stripe_secret },
+        { name = "STRIPE_PUBLIC", value = var.stripe_public }
+      ]
     }
-  }
-
-  # Inject secrets as environment variables (remove from Dockerfile)
-  environment = [
-    { name = "STRIPE_SECRET", value = var.stripe_secret },
-    { name = "STRIPE_PUBLIC", value = var.stripe_public }
-  ]
-}])
+  ])
+}
 
 # ==========================================
 # ECS Service
@@ -129,13 +139,9 @@ resource "aws_ecs_service" "easybank" {
     assign_public_ip = false
   }
 
-
   load_balancer {
     target_group_arn = aws_lb_target_group.easybank.arn
     container_name   = "easybank"
     container_port   = 8080
   }
-
-
-
 }
