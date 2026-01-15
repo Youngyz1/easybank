@@ -16,21 +16,22 @@ permissions:
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
   TF_VAR_db_password: ${{ secrets.TF_VAR_db_password }}
 
 jobs:
-  # ============================================================
-  # Job 1: Provision Base Infrastructure (ECR included)
-  # ============================================================
+# ============================================================
+# JOB 1: BASE INFRA (NO APP IMAGE DEPENDENCY)
+# ============================================================
   terraform-base:
     name: Provision Base Infrastructure
     runs-on: ubuntu-latest
     outputs:
       ECR_URI: ${{ steps.get-ecr.outputs.ECR_URI }}
+
     defaults:
       run:
         working-directory: easybank-infra
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,37 +48,35 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      - name: Terraform Init & Apply
+      - name: Terraform Init / Validate / Apply (Base Infra)
         run: |
           terraform init -input=false
           terraform validate
-          terraform plan -out=tfplan
-          terraform apply -auto-approve tfplan
+          terraform apply -auto-approve
 
       - name: Get ECR Repository URI
         id: get-ecr
         run: |
-          REPO_URI=$(terraform output -raw easybank_ecr_url)
-          echo "ECR_URI=$REPO_URI" >> $GITHUB_ENV
-          echo "ECR_URI=$REPO_URI" >> $GITHUB_OUTPUT
+          ECR_URI=$(terraform output -raw easybank_ecr_url)
+          echo "ECR_URI=$ECR_URI" >> $GITHUB_OUTPUT
+          echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
 
-  # ============================================================
-  # Job 2: Build Docker Image and Deploy ECS
-  # ============================================================
-  build-and-deploy:
-    name: Build Docker Image & Deploy ECS
+# ============================================================
+# JOB 2: BUILD & PUSH DOCKER IMAGE
+# ============================================================
+  build-image:
+    name: Build & Push Docker Image
     runs-on: ubuntu-latest
     needs: terraform-base
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set image tag from Git SHA
-        id: set-sha
+      - name: Set Image Tag (Git SHA)
         run: |
           IMAGE_TAG=${GITHUB_SHA::7}
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -91,41 +90,57 @@ jobs:
           aws ecr get-login-password --region $AWS_REGION \
           | docker login --username AWS --password-stdin ${{ needs.terraform-base.outputs.ECR_URI }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          install: true
-
       - name: Build & Push Docker Image
         run: |
-          IMAGE_URI=${{ needs.terraform-base.outputs.ECR_URI }}
-          CACHE_TAG=cache
-          docker buildx build \
-            --platform linux/amd64 \
-            --pull \
-            --progress=plain \
-            --cache-from type=registry,ref=$IMAGE_URI:$CACHE_TAG \
-            --cache-to type=registry,ref=$IMAGE_URI:$CACHE_TAG,mode=max \
-            -t $IMAGE_URI:${{ steps.set-sha.outputs.IMAGE_TAG }} \
-            --push .
+          docker build \
+            -t ${{ needs.terraform-base.outputs.ECR_URI }}:$IMAGE_TAG .
+          docker push \
+            ${{ needs.terraform-base.outputs.ECR_URI }}:$IMAGE_TAG
 
       - name: Trivy Image Scan (Fail on CRITICAL)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: ${{ needs.terraform-base.outputs.ECR_URI }}:${{ steps.set-sha.outputs.IMAGE_TAG }}
+          image-ref: ${{ needs.terraform-base.outputs.ECR_URI }}:$IMAGE_TAG
           scan-type: image
-          scanners: vuln
-          vuln-type: os,library
           severity: CRITICAL
-          ignore-unfixed: true
           exit-code: 1
-          format: table
+          ignore-unfixed: true
           hide-progress: true
 
-      - name: Deploy ECS with new image
+# ============================================================
+# JOB 3: DEPLOY ECS (IMAGE-DRIVEN)
+# ============================================================
+  deploy-ecs:
+    name: Deploy ECS with New Image
+    runs-on: ubuntu-latest
+    needs: build-image
+
+    defaults:
+      run:
+        working-directory: easybank-infra
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Deploy ECS with Git SHA Image
         run: |
-          EASYBANK_IMAGE=${{ needs.terraform-base.outputs.ECR_URI }}:${{ steps.set-sha.outputs.IMAGE_TAG }}
+          IMAGE_URI=${{ needs.terraform-base.outputs.ECR_URI }}:$IMAGE_TAG
           terraform init -input=false
           terraform validate
-          terraform plan -out=tfplan -var="easybank_image=$EASYBANK_IMAGE"
+          terraform plan \
+            -var="easybank_image=$IMAGE_URI" \
+            -out=tfplan
           terraform apply -auto-approve tfplan
