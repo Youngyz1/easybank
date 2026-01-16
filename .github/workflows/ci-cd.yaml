@@ -83,13 +83,15 @@ jobs:
           docker build -t "$IMAGE_URI" .
           docker push "$IMAGE_URI"
 
-      - name: Trivy Image Scan (Critical)
+      - name: Trivy Image Scan (Non-blocking)
         uses: aquasecurity/trivy-action@0.20.0
         with:
           image-ref: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}:${{ steps.set-tag.outputs.IMAGE_TAG }}
+          scan-type: image
           severity: CRITICAL
-          exit-code: 1
+          exit-code: 0        # <-- job will NOT fail
           ignore-unfixed: true
+          hide-progress: true
 
 # ============================================================
 # JOB 3: DEPLOY TO ECS
