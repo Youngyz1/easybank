@@ -116,16 +116,7 @@ resource "aws_ecs_task_definition" "easybank" {
         }
       }
 
-      secrets = [
-        {
-          name      = "STRIPE_SECRET"
-          valueFrom = "${aws_secretsmanager_secret.stripe.arn}:STRIPE_SECRET::"
-        },
-        {
-          name      = "STRIPE_PUBLIC"
-          valueFrom = "${aws_secretsmanager_secret.stripe.arn}:STRIPE_PUBLIC::"
-        }
-      ]
+
     }
   ])
 }
