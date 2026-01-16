@@ -73,14 +73,3 @@ variable "lb_target_group_arn" {
   type        = string
 }
 
-variable "stripe_secret" {
-  description = "Stripe secret key (passed via CI/CD)"
-  type        = string
-  sensitive   = true
-}
-
-variable "stripe_public" {
-  description = "Stripe public key (passed via CI/CD)"
-  type        = string
-  sensitive   = true
-}
