@@ -97,6 +97,9 @@ resource "aws_ecs_task_definition" "easybank" {
       image     = var.easybank_image
       essential = true
 
+      cpu    = 512
+      memory = 1024
+
       portMappings = [
         {
           containerPort = 8080
@@ -113,13 +116,20 @@ resource "aws_ecs_task_definition" "easybank" {
         }
       }
 
-      environment = [
-        { name = "STRIPE_SECRET", value = var.stripe_secret },
-        { name = "STRIPE_PUBLIC", value = var.stripe_public }
+      secrets = [
+        {
+          name      = "STRIPE_SECRET"
+          valueFrom = "${aws_secretsmanager_secret.stripe.arn}:STRIPE_SECRET::"
+        },
+        {
+          name      = "STRIPE_PUBLIC"
+          valueFrom = "${aws_secretsmanager_secret.stripe.arn}:STRIPE_PUBLIC::"
+        }
       ]
     }
   ])
 }
+
 
 # ==========================================
 # ECS Service
