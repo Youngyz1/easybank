@@ -14,14 +14,13 @@ env:
   TF_VAR_db_password: ${{ secrets.TF_VAR_db_password }}
   ECR_REPO_NAME: easybank
 
-# ============================================================
-# JOB 1: BASE INFRA (RUN ONCE / CONTROLLED)
-# ============================================================
 jobs:
+# ============================================================
+# JOB 1: PROVISION INFRASTRUCTURE
+# ============================================================
   terraform-base:
     name: Provision Base Infrastructure
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
     defaults:
       run:
         working-directory: easybank-infra
@@ -29,7 +28,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -39,9 +39,10 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      - name: Terraform Init / Apply
+      - name: Terraform Init / Validate / Apply
         run: |
           terraform init -input=false
+          terraform validate
           terraform apply -auto-approve
 
 # ============================================================
@@ -50,7 +51,7 @@ jobs:
   build-image:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
-
+    needs: terraform-base
     outputs:
       IMAGE_TAG: ${{ steps.set-tag.outputs.IMAGE_TAG }}
 
@@ -63,25 +64,26 @@ jobs:
           IMAGE_TAG=${GITHUB_SHA::7}
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | \
           docker login --username AWS --password-stdin \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      - name: Build & Push Image
+      - name: Build & Push Docker Image
         run: |
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME:${{ steps.set-tag.outputs.IMAGE_TAG }}"
           docker build -t "$IMAGE_URI" .
           docker push "$IMAGE_URI"
 
-      - name: Trivy Scan (Critical only)
+      - name: Trivy Image Scan (Critical)
         uses: aquasecurity/trivy-action@0.20.0
         with:
           image-ref: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}:${{ steps.set-tag.outputs.IMAGE_TAG }}
@@ -90,10 +92,10 @@ jobs:
           ignore-unfixed: true
 
 # ============================================================
-# JOB 3: DEPLOY ECS (IMAGE-ONLY CHANGE)
+# JOB 3: DEPLOY TO ECS
 # ============================================================
   deploy-ecs:
-    name: Deploy to ECS
+    name: Deploy ECS with New Image
     runs-on: ubuntu-latest
     needs: build-image
     defaults:
@@ -103,7 +105,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -113,14 +116,14 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      - name: Deploy ECS Service
+      - name: Deploy ECS
         run: |
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME:${{ needs.build-image.outputs.IMAGE_TAG }}"
           terraform init -input=false
           terraform plan -var="easybank_image=$IMAGE_URI" -out=tfplan
           terraform apply -auto-approve tfplan
 
-      - name: Wait for ECS Stability
+      - name: Wait for ECS Service Stability
         run: |
           aws ecs wait services-stable \
             --cluster easybank-cluster \
