@@ -25,14 +25,15 @@ resource "aws_lb_target_group" "easybank" {
   target_type = "ip" # Required for Fargate
 
   health_check {
-    interval            = 30
-    path                = "/"
-    port                = "8080"
-    protocol            = "HTTP"
-    timeout             = 5
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-  }
+  interval            = 15
+  path                = "/health.php"
+  port                = "traffic-port"
+  protocol            = "HTTP"
+  matcher             = "200"
+  timeout             = 5
+  healthy_threshold   = 2
+  unhealthy_threshold = 3
+}
 
   tags = {
     Name = "easybank-tg"
