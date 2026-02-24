@@ -49,6 +49,11 @@ jobs:
         with:
           terraform_version: 1.6.6
 
+      # ✅ FIX: Build Lambda ZIP from root-level lambda_function.py
+      # working-directory is easybank-infra, so we step up one level to grab the file
+      - name: Build Lambda ZIP
+        run: zip lambda_sns_to_slack.zip ../lambda_function.py
+
       - name: Terraform Init / Validate / Apply
         run: |
           terraform init -input=false
