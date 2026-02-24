@@ -49,8 +49,7 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      # ✅ FIX: Build Lambda ZIP from root-level lambda_function.py
-      # working-directory is easybank-infra, so we step up one level to grab the file
+      # ✅ FIX: Build Lambda ZIP before Terraform runs
       - name: Build Lambda ZIP
         run: zip lambda_sns_to_slack.zip ../lambda_function.py
 
@@ -160,6 +159,10 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
+
+      # ✅ FIX: Each job runs on a fresh runner — ZIP must be rebuilt here too
+      - name: Build Lambda ZIP
+        run: zip lambda_sns_to_slack.zip ../lambda_function.py
 
       - name: Deploy ECS
         run: |
