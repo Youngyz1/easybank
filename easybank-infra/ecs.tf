@@ -159,4 +159,8 @@ resource "aws_ecs_service" "easybank" {
     container_name   = "easybank"
     container_port   = 8080
   }
+
+  depends_on = [
+    aws_lb_listener.https
+  ]
 }
