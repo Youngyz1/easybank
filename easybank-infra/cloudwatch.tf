@@ -35,7 +35,8 @@ resource "aws_lambda_function" "sns_to_slack" {
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.11"
 
-  filename = "${path.module}/lambda_sns_to_slack.zip"
+  filename         = "${path.module}/lambda_sns_to_slack.zip"
+  source_code_hash = filebase64sha256("${path.module}/lambda_sns_to_slack.zip")
 
   environment {
     variables = {
@@ -156,63 +157,59 @@ resource "aws_cloudwatch_dashboard" "easybank" {
   dashboard_body = jsonencode({
     widgets = [
       {
-        type       = "metric"
-        x          = 0
-        y          = 0
-        width      = 6
-        height     = 6
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 6
+        height = 6
         properties = {
-          title       = "ECS CPU Utilization"
-          metrics     = [["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.easybank.name, "ServiceName", aws_ecs_service.easybank.name]]
-          period      = 60
-          stat        = "Average"
-          region      = var.aws_region
-          annotations = []
+          title   = "ECS CPU Utilization"
+          metrics = [["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.easybank.name, "ServiceName", aws_ecs_service.easybank.name]]
+          period  = 60
+          stat    = "Average"
+          region  = var.aws_region
         }
       },
       {
-        type       = "metric"
-        x          = 6
-        y          = 0
-        width      = 6
-        height     = 6
+        type   = "metric"
+        x      = 6
+        y      = 0
+        width  = 6
+        height = 6
         properties = {
-          title       = "ECS Memory Utilization"
-          metrics     = [["AWS/ECS", "MemoryUtilization", "ClusterName", aws_ecs_cluster.easybank.name, "ServiceName", aws_ecs_service.easybank.name]]
-          period      = 60
-          stat        = "Average"
-          region      = var.aws_region
-          annotations = []
+          title   = "ECS Memory Utilization"
+          metrics = [["AWS/ECS", "MemoryUtilization", "ClusterName", aws_ecs_cluster.easybank.name, "ServiceName", aws_ecs_service.easybank.name]]
+          period  = 60
+          stat    = "Average"
+          region  = var.aws_region
         }
       },
       {
-        type       = "metric"
-        x          = 0
-        y          = 6
-        width      = 6
-        height     = 6
+        type   = "metric"
+        x      = 0
+        y      = 6
+        width  = 6
+        height = 6
         properties = {
-          title       = "RDS CPU Utilization"
-          metrics     = [["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", aws_db_instance.easybank.id]]
-          period      = 60
-          stat        = "Average"
-          region      = var.aws_region
-          annotations = []
+          title   = "RDS CPU Utilization"
+          metrics = [["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", aws_db_instance.easybank.id]]
+          period  = 60
+          stat    = "Average"
+          region  = var.aws_region
         }
       },
       {
-        type       = "metric"
-        x          = 6
-        y          = 6
-        width      = 6
-        height     = 6
+        type   = "metric"
+        x      = 6
+        y      = 6
+        width  = 6
+        height = 6
         properties = {
-          title       = "ALB 5XX Errors"
-          metrics     = [["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", aws_lb.easybank.arn_suffix]]
-          period      = 60
-          stat        = "Sum"
-          region      = var.aws_region
-          annotations = []
+          title   = "ALB 5XX Errors"
+          metrics = [["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", aws_lb.easybank.arn_suffix]]
+          period  = 60
+          stat    = "Sum"
+          region  = var.aws_region
         }
       }
     ]
