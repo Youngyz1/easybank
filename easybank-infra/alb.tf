@@ -24,6 +24,12 @@ resource "aws_lb_target_group" "easybank" {
   vpc_id      = aws_vpc.easybank.id
   target_type = "ip"
 
+  stickiness {
+    type            = "lb_cookie"
+    cookie_duration = 86400
+    enabled         = true
+  }
+
   health_check {
     interval            = 30
     path                = "/health.php"
