@@ -76,7 +76,7 @@ if (isset($_POST['submit_step1'])) {
                         'Charset' => 'UTF-8',
                     ],
                 ],
-                'Source' => 'you@yourdomain.com', // verified SES sender
+                'Source' => 'ofiliyoungyz@gmail.com', // verified SES sender
             ]);
         } catch (AwsException $e) {
             $error_msg = "Failed to send verification email: " . $e->getAwsErrorMessage();
@@ -92,10 +92,11 @@ if (isset($_POST['submit_step1'])) {
 if (isset($_POST['submit_pin'])) {
     $entered_pin = $_POST['verification_pin'] ?? '';
     if (isset($_SESSION['pin']) && $entered_pin == $_SESSION['pin']) {
+        $_SESSION['step1'] = true;
         $_SESSION['step2'] = true;
         unset($_SESSION['pin']); // remove PIN after successful verification
         // Redirect to next registration step or dashboard
-        echo "<script>location.href='page-register3.php';</script>";
+        echo "<script>location.href='page-register2.php';</script>";
         exit;
     } else {
         $error_msg = "Invalid PIN. Please try again.";

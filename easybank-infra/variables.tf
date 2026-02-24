@@ -31,11 +31,10 @@ variable "db_password" {
   sensitive   = true
 }
 
-# Optional: database username
 variable "db_username" {
   description = "RDS database master username"
   type        = string
-  default     = "easybank_admin"
+  default     = "easybank"
 }
 
 # ==========================================
@@ -44,12 +43,11 @@ variable "db_username" {
 variable "easybank_image" {
   description = "Full ECS Docker image URI (Git SHA tagged)"
   type        = string
-  default     = "public.ecr.aws/nginx/nginx:latest"
+  default     = "958421185668.dkr.ecr.us-east-1.amazonaws.com/easybank:latest"
 }
 
-
 # ==========================================
-# Optional: ECS cluster and service names
+# ECS cluster and service names
 # ==========================================
 variable "ecs_cluster_name" {
   description = "ECS Cluster name for EasyBank"
@@ -64,12 +62,10 @@ variable "ecs_service_name" {
 }
 
 # ==========================================
-# ECS input variables
+# Slack
 # ==========================================
-
-
-variable "lb_target_group_arn" {
-  description = "ARN of the existing ALB target group"
+variable "slack_webhook_url" {
+  description = "Slack incoming webhook URL for alerts"
   type        = string
+  sensitive   = true
 }
-

@@ -6,15 +6,14 @@ if(!isset($_SESSION['step1']) || !isset($_SESSION['step2']) || !isset($_SESSION[
     exit;
 }
 
-require 'vendor/autoload.php'; // AWS SDK for PHP
+require 'vendor/autoload.php';
 
 use Aws\Ses\SesClient;
 use Aws\Exception\AwsException;
 
-// Configure AWS SES client (region must match your SES setup)
 $SesClient = new SesClient([
     'version' => 'latest',
-    'region'  => 'us-east-1', // change if different
+    'region'  => 'us-east-1',
 ]);
 
 error_reporting(E_ALL | E_WARNING | E_NOTICE);
@@ -30,13 +29,19 @@ if(isset($_POST['submit_end'])) {
         $identity_back_size = $_FILES['identity_back']['size'];
         $identity_back_data = addslashes(file_get_contents($_FILES['identity_back']['tmp_name']));
         $allowed_imgs = ["image/pjpeg","image/jpeg","image/jpg","image/png","image/x-png","image/gif"];
+
+        if(empty($_FILES['identity_back']['tmp_name'])) {
+            echo '<script>alert("This field is required");</script>';
+            echo "<script>location.href='page-register4.php'</script>";
+            exit;
+        }
+
         if(!in_array($identity_back_type, $allowed_imgs)) {
             echo '<script>alert("This file is not an image");</script>';
             echo "<script>location.href='page-register4.php'</script>";
             exit;
         }
 
-        // Collect registration data from session
         $first_name = $_SESSION['first_name'];
         $last_name = $_SESSION['last_name'];
         $date_of_birth = $_SESSION['day']."-".$_SESSION['month']."-".$_SESSION['year'];
@@ -59,11 +64,9 @@ if(isset($_POST['submit_end'])) {
         $password = $_SESSION['password'];
         $ip_instant_register = $_SERVER['REMOTE_ADDR'];
 
-        // Generate PIN
         $pin = substr(str_shuffle("0123456789"), 0, 4);
         $pin_hashed = md5($pin);
 
-        // Generate account info
         $number_bank_code = substr(str_shuffle("0123456789"), 0, 2);
         $account_number = substr(str_shuffle("0123456789"), 0, 10);
         $bank_iso = "EB";
@@ -74,14 +77,11 @@ if(isset($_POST['submit_end'])) {
         $bank_account_user = $account_number;
         $IBAN = $bank_iso.$bank_code.$bank_identity.$bank_acc_begin.$bank_default_number.$bank_account_user;
 
-        // Database insertion
         require_once('__SRC__/connect.php');
         if(class_exists('DATABASE_CONNECT')) {
             $obj_conn = new DATABASE_CONNECT;
-            $conn = new mysqli($obj_conn->connect[0], $obj_conn->connect[1], $obj_conn->connect[2], $obj_conn->connect[3]);
-            if($conn->connect_error) die("Cannot connect ".$conn->connect_error);
+            $conn = $obj_conn->get_connection();
 
-            // Insert customer
             $sql = "INSERT INTO customers (
                         firstname, lastname, date_of_birth, nationality, id_document_number,
                         mobile_area_code, mobile_number, country, town_city, street, street_number, post_code,
@@ -96,7 +96,6 @@ if(isset($_POST['submit_end'])) {
                         '$email','$password','$pin_hashed','$account_number','$IBAN','block',NOW(),'$ip_instant_register'
                     )";
 
-            // Insert account
             $sql2 = "INSERT INTO accounts (
                         currency, email, lastname, firstname, account_no, IBAN,
                         limit_per_day_transfer, over_transfer, amounts_transferred, amounts_from_reserve,
@@ -107,7 +106,6 @@ if(isset($_POST['submit_end'])) {
                         '0.00','0.00','0.00','on_hold','unused',''
                     )";
 
-            // Notifications
             $sql3 = "INSERT INTO notifications (email, lastname, firstname, title, message)
                      VALUES ('$email','$last_name','$first_name','Welcome','Welcome to Easy Bank');";
             $sql3 .= "INSERT INTO notifications (email, lastname, firstname, title, message)
@@ -120,14 +118,11 @@ if(isset($_POST['submit_end'])) {
             $conn->multi_query($sql3);
             $conn->close();
 
-            // Send email via SES
             try {
                 $result = $SesClient->sendEmail([
-                    'Destination' => [
-                        'ToAddresses' => [$email],
-                    ],
-                    'ReplyToAddresses' => ['no-reply@yourdomain.com'], // replace with your SES-verified email
-                    'Source' => 'no-reply@yourdomain.com',            // replace with your SES-verified email
+                    'Destination' => ['ToAddresses' => [$email]],
+                    'ReplyToAddresses' => ['ofiliyoungyz@gmail.com'],
+                    'Source' => 'ofiliyoungyz@gmail.com',
                     'Message' => [
                         'Subject' => ['Data' => 'EasyBank PIN Code', 'Charset' => 'UTF-8'],
                         'Body' => [
@@ -136,8 +131,8 @@ if(isset($_POST['submit_end'])) {
                         ],
                     ],
                 ]);
-                echo '<script>alert("Check your email for your PIN code.");</script>';
-                echo "<script>location.href='logout.php'</script>";
+                echo '<script>alert("Registration complete! Check your email for your PIN code.");</script>';
+                echo "<script>location.href='index.php'</script>";
             } catch (AwsException $e) {
                 echo "<script>alert('PIN email failed: ".$e->getAwsErrorMessage()."');</script>";
                 echo "<script>location.href='index.php'</script>";
@@ -146,3 +141,106 @@ if(isset($_POST['submit_end'])) {
     }
 }
 ?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Easybank</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="shortcut icon" href="favicon.png" type="image/png">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="assets/css/normalize.css">
+    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/css/font-awesome.min.css">
+    <link rel="stylesheet" href="assets/scss/style.css">
+    <style>
+    body {
+        background-image: url("/images/bg1.jpg");
+        background-repeat: no-repeat;
+        background-size: 100% 100%;
+    }
+    .btn-file {
+        position: relative;
+        overflow: hidden;
+    }
+    .btn-file input[type=file] {
+        position: absolute;
+        top: 0; right: 0;
+        min-width: 100%; min-height: 100%;
+        font-size: 100px;
+        opacity: 0;
+        cursor: inherit;
+        display: block;
+    }
+    #img-upload { height: 40%; width: 100%; }
+    </style>
+    <script>
+    $(document).ready(function() {
+        $(document).on('change', '.btn-file :file', function() {
+            var input = $(this), label = input.val().replace(/\\/g, '/').replace(/.*\//, '');
+            input.trigger('fileselect', [label]);
+        });
+        $('.btn-file :file').on('fileselect', function(event, label) {
+            var input = $(this).parents('.input-group').find(':text');
+            if(input.length) input.val(label);
+        });
+        function readURL(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) { $('#img-upload').attr('src', e.target.result); }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        $("#imgInp").change(function(){ readURL(this); });
+    });
+    </script>
+</head>
+<body>
+    <div class="sufee-login d-flex align-content-center flex-wrap">
+        <div class="container">
+            <div class="login-content">
+                <div class="login-logo">
+                    <img src="images/logo4.png" height="130" width="27%">
+                    <img src="images/bg5.png" height="130" width="33%">
+                    <img src="images/logo5.png" height="130" width="27%">
+                </div>
+                <div class="login-form" style="width: 550px; position: relative; left: 0%;">
+                    <form action="" method="post" enctype="multipart/form-data">
+                        <h3 align="center">
+                            <font color="black"><b><i>&dollar;&dollar; EASYBANK ACCOUNT &euro;&euro;</i></b></font>
+                        </h3><hr>
+                        <h3 align="center"><font color="black"><b>Step 4: Back of your ID</b></font></h3>
+
+                        <div class="container">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <div align="center"><label>Back image of identity</label></div>
+                                    <div class="input-group">
+                                        <span class="btn btn-default btn-file glyphicon glyphicon-open-file">
+                                            Browse… <input type="file" name="identity_back" id="imgInp" required>
+                                        </span>
+                                        <input type="text" class="form-control" readonly>
+                                    </div>
+                                    <img id='img-upload'/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="wrapper">
+                            <span class="group-btn">
+                                <button type="submit" name="submit_end" class="btn btn-success btn-flat m-b-30 m-t-30">
+                                    Complete Registration <i class="glyphicon glyphicon-ok"></i>
+                                </button>
+                            </span>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

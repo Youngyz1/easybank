@@ -27,24 +27,22 @@ class DATABASE_CONNECT_BACKUP
     public $connect_db2 = array();
 
     public function __construct()
-    {
-        // Server connection (no DB)
-        $this->connect[0] = "localhost";
-        $this->connect[1] = "easybank_user";
-        $this->connect[2] = "easybank_pass";
+    
+{
+    $this->connect[0] = getenv("DB_HOST") ?: "localhost";
+    $this->connect[1] = getenv("DB_USER") ?: "easybank_user";
+    $this->connect[2] = getenv("DB_PASS") ?: "easybank_pass";
 
-        // Main database
-        $this->connect_db1[0] = "localhost";
-        $this->connect_db1[1] = "easybank_user";
-        $this->connect_db1[2] = "easybank_pass";
-        $this->connect_db1[3] = "easybank";
+    $this->connect_db1[0] = getenv("DB_HOST") ?: "localhost";
+    $this->connect_db1[1] = getenv("DB_USER") ?: "easybank_user";
+    $this->connect_db1[2] = getenv("DB_PASS") ?: "easybank_pass";
+    $this->connect_db1[3] = getenv("DB_NAME") ?: "easybank";
 
-        // Backup database
-        $this->connect_db2[0] = "localhost";
-        $this->connect_db2[1] = "easybank_user";
-        $this->connect_db2[2] = "easybank_pass";
-        $this->connect_db2[3] = "easybank_2";
-    }
+    $this->connect_db2[0] = getenv("DB_HOST") ?: "localhost";
+    $this->connect_db2[1] = getenv("DB_USER") ?: "easybank_user";
+    $this->connect_db2[2] = getenv("DB_PASS") ?: "easybank_pass";
+    $this->connect_db2[3] = getenv("DB_NAME_BACKUP") ?: "easybank_2";
+}
 
     public function __destruct()
     {

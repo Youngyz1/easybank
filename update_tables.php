@@ -2,9 +2,7 @@
 require_once('__SRC__/connect.php');
 
 $obj_conn = new DATABASE_CONNECT();
-$conn = new mysqli($obj_conn->connect[0], $obj_conn->connect[1], $obj_conn->connect[2], $obj_conn->connect[3]);
-
-if ($conn->connect_error) die("Connection failed: " . $conn->connect_error);
+$conn = $obj_conn->get_connection();
 
 $queries = [
     "ALTER TABLE customers ADD COLUMN firstname VARCHAR(50) NOT NULL AFTER id, ADD COLUMN lastname VARCHAR(50) NOT NULL AFTER firstname;",

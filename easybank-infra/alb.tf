@@ -22,18 +22,18 @@ resource "aws_lb_target_group" "easybank" {
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = aws_vpc.easybank.id
-  target_type = "ip" # Required for Fargate
+  target_type = "ip"
 
   health_check {
-  interval            = 15
-  path                = "/health.php"
-  port                = "traffic-port"
-  protocol            = "HTTP"
-  matcher             = "200"
-  timeout             = 5
-  healthy_threshold   = 2
-  unhealthy_threshold = 3
-}
+    interval            = 30
+    path                = "/health.php"
+    port                = "8080"
+    protocol            = "HTTP"
+    matcher             = "200"
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+  }
 
   tags = {
     Name = "easybank-tg"
@@ -41,18 +41,37 @@ resource "aws_lb_target_group" "easybank" {
 }
 
 # ==========================================
-# ALB Listener
+# HTTP Listener → Redirect to HTTPS
 # ==========================================
-resource "aws_lb_listener" "easybank" {
+resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.easybank.arn
   port              = 80
   protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+# ==========================================
+# HTTPS Listener
+# ==========================================
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.easybank.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = aws_acm_certificate_validation.easybank.certificate_arn
 
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.easybank.arn
   }
 
-  # Ensure listener is created after target group
-  depends_on = [aws_lb_target_group.easybank]
+  depends_on = [aws_acm_certificate_validation.easybank]
 }

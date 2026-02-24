@@ -11,7 +11,7 @@ resource "aws_cloudwatch_log_group" "easybank" {
 }
 
 # ==========================================
-# ECS Task Execution IAM Role (internal use)
+# ECS Task Execution IAM Role
 # ==========================================
 resource "aws_iam_role" "ecs_task_execution" {
   name = "ecsTaskExecutionRole"
@@ -39,7 +39,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_ecr_access" {
 }
 
 # ==========================================
-# ECS Task Role (app role, e.g., SES)
+# ECS Task Role
 # ==========================================
 resource "aws_iam_role" "ecs_task_role" {
   name = "easybank-task-role"
@@ -56,7 +56,6 @@ resource "aws_iam_role" "ecs_task_role" {
   })
 }
 
-# SES send email policy
 resource "aws_iam_policy" "ecs_ses_send_email" {
   name        = "ECS_SES_SendEmail"
   description = "Allow ECS tasks to send emails via SES"
@@ -96,14 +95,32 @@ resource "aws_ecs_task_definition" "easybank" {
       name      = "easybank"
       image     = var.easybank_image
       essential = true
-
-      cpu    = 512
-      memory = 1024
+      cpu       = 512
+      memory    = 1024
 
       portMappings = [
         {
           containerPort = 8080
           protocol      = "tcp"
+        }
+      ]
+
+      secrets = [
+        {
+          name      = "DB_HOST"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:host::"
+        },
+        {
+          name      = "DB_USER"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:username::"
+        },
+        {
+          name      = "DB_PASS"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:password::"
+        },
+        {
+          name      = "DB_NAME"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:dbname::"
         }
       ]
 
@@ -115,12 +132,9 @@ resource "aws_ecs_task_definition" "easybank" {
           awslogs-stream-prefix = "ecs"
         }
       }
-
-
     }
   ])
 }
-
 
 # ==========================================
 # ECS Service

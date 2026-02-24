@@ -139,14 +139,7 @@ if (isset($_POST['submit_login'])) {
 
         if (class_exists('DATABASE_CONNECT')) {
             $obj_conn = new DATABASE_CONNECT;
-            $conn = new mysqli(
-                $obj_conn->connect[0],
-                $obj_conn->connect[1],
-                $obj_conn->connect[2],
-                $obj_conn->connect[3]
-            );
-
-            if ($conn->connect_error) die("Cannot connect: " . $conn->connect_error);
+            $conn = $obj_conn->get_connection();
 
             // Hash both password and PIN before checking
             $email = $conn->real_escape_string($email);

@@ -405,17 +405,7 @@ require_once('__SRC__/connect.php');
  
              $obj_conn  = new DATABASE_CONNECT;
             
-             $host = $obj_conn->connect[0];
-             $user = $obj_conn->connect[1];
-             $pass = $obj_conn->connect[2];
-             $db   = $obj_conn->connect[3];
-
- 
-              $conn = new mysqli($host,$user,$pass,$db);
- 
-                 if ($conn->connect_error)
-                      {
-                       die ("Cannot connect " .$conn->connect_error);
+             $conn = $obj_conn->get_connection();
                         }
 
 

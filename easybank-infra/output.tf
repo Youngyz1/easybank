@@ -34,3 +34,10 @@ output "easybank_ecr_url" {
   value = aws_ecr_repository.easybank.repository_url
 }
 
+output "nameservers" {
+  value = aws_route53_zone.easybank.name_servers
+}
+
+output "sonarqube_url" {
+  value = "http://${aws_instance.sonarqube.public_ip}:9000"
+}

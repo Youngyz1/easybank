@@ -1,40 +1,24 @@
 <?php
-
-/*
- * Copyright (c) 2018 Barchampas Gerasimos <makindosx@gmail.com>
- * online-banking a online banking system for local businesses.
- *
- * online-banking is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * online-banking is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
- *
- */
-
 class DATABASE_CONNECT {
     public $connect;
-
-    public function __construct() {
-        $this->connect = array(
-            getenv("DB_HOST") ?: "localhost",
-            getenv("DB_USER") ?: "easybank_user",
-            getenv("DB_PASS") ?: "easybank_pass",
-            getenv("DB_NAME") ?: "easybank"
-        );
+    public function __construct()
+    {
+        $this->connect[0] = getenv("DB_HOST") ?: "localhost";
+        $this->connect[1] = getenv("DB_USER") ?: "easybank";
+        $this->connect[2] = getenv("DB_PASS") ?: "easybank";
+        $this->connect[3] = getenv("DB_NAME") ?: "easybank";
     }
-
-    public function __destruct() {
-        // Clean up the connection array
+    public function get_connection()
+    {
+        $conn = mysqli_init();
+        $conn->ssl_set(NULL, NULL, __DIR__ . "/rds-ca.pem", NULL, NULL);
+        $conn->real_connect($this->connect[0], $this->connect[1], $this->connect[2], $this->connect[3], 3306, NULL, MYSQLI_CLIENT_SSL);
+        if($conn->connect_error) die("Cannot connect: " . $conn->connect_error);
+        return $conn;
+    }
+    public function __destruct()
+    {
         $this->connect = null;
     }
 }
-
 ?>

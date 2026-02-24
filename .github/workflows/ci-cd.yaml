@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
 
 permissions:
   contents: read
@@ -11,7 +20,8 @@ permissions:
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  TF_VAR_db_password: ${{ secrets.TF_VAR_db_password }}
+  TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+  TF_VAR_slack_webhook_url: ${{ secrets.TF_VAR_SLACK_WEBHOOK_URL }}
   ECR_REPO_NAME: easybank
 
 jobs:
@@ -44,6 +54,20 @@ jobs:
           terraform init -input=false
           terraform validate
           terraform apply -auto-approve
+
+      - name: Notify Slack - Infrastructure
+        if: always()
+        uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          message: |
+            *EasyBank Infrastructure Provisioning*
+            Status: ${{ job.status }}
+            Triggered by: ${{ github.actor }}
+            Reason: ${{ github.event_name }}
+            Commit: ${{ github.sha }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 # ============================================================
 # JOB 2: BUILD & PUSH IMAGE
@@ -83,15 +107,29 @@ jobs:
           docker build -t "$IMAGE_URI" .
           docker push "$IMAGE_URI"
 
-      - name: Trivy Image Scan (Non-blocking)
+      - name: Trivy Image Scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
           image-ref: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}:${{ steps.set-tag.outputs.IMAGE_TAG }}
           scan-type: image
           severity: CRITICAL
-          exit-code: 0        # <-- job will NOT fail
+          exit-code: 0
           ignore-unfixed: true
           hide-progress: true
+
+      - name: Notify Slack - Build
+        if: always()
+        uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          message: |
+            *EasyBank Docker Build & Push*
+            Status: ${{ job.status }}
+            Image Tag: ${{ steps.set-tag.outputs.IMAGE_TAG }}
+            Triggered by: ${{ github.actor }}
+            Commit: ${{ github.sha }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 # ============================================================
 # JOB 3: DEPLOY TO ECS
@@ -130,3 +168,19 @@ jobs:
           aws ecs wait services-stable \
             --cluster easybank-cluster \
             --services easybank-service
+
+      - name: Notify Slack - Deploy
+        if: always()
+        uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          message: |
+            *EasyBank ECS Deployment*
+            Status: ${{ job.status }}
+            Cluster: easybank-cluster
+            Service: easybank-service
+            Triggered by: ${{ github.actor }}
+            Commit: ${{ github.sha }}
+            URL: https://ofiliyoungyz.site
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

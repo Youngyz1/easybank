@@ -18,7 +18,7 @@ RUN sed -i 's/80/8080/' /etc/apache2/ports.conf && \
     sed -i 's/:80/:8080/' /etc/apache2/sites-available/000-default.conf
 
 # Install PHP extensions
-RUN docker-php-ext-install pdo pdo_mysql zip
+RUN docker-php-ext-install pdo pdo_mysql mysqli zip
 
 # -----------------------------
 # Install Composer (official)
