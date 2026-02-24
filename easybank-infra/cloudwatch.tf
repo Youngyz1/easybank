@@ -5,10 +5,63 @@ resource "aws_sns_topic" "alerts" {
   name = "easybank-alerts"
 }
 
-resource "aws_sns_topic_subscription" "slack_lambda" {
+# ==========================================
+# Lambda IAM Role for SNS → Slack
+# ==========================================
+resource "aws_iam_role" "lambda_sns_to_slack" {
+  name = "lambda_sns_to_slack_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
+  role       = aws_iam_role.lambda_sns_to_slack.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# ==========================================
+# Lambda Function for SNS → Slack
+# ==========================================
+resource "aws_lambda_function" "sns_to_slack" {
+  function_name = "sns_to_slack"
+  role          = aws_iam_role.lambda_sns_to_slack.arn
+  handler       = "lambda_function.lambda_handler"
+  runtime       = "python3.11"
+
+  filename = "${path.module}/lambda_sns_to_slack.zip"
+
+  environment {
+    variables = {
+      SLACK_WEBHOOK_URL = var.slack_webhook_url
+    }
+  }
+
+  depends_on = [aws_iam_role_policy_attachment.lambda_basic_execution]
+}
+
+# ==========================================
+# Lambda Subscription to SNS (Slack integration)
+# ==========================================
+resource "aws_sns_topic_subscription" "lambda_subscription" {
   topic_arn = aws_sns_topic.alerts.arn
-  protocol  = "https"
-  endpoint  = var.slack_webhook_url
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.sns_to_slack.arn
+}
+
+# Allow SNS to invoke Lambda
+resource "aws_lambda_permission" "allow_sns" {
+  statement_id  = "AllowExecutionFromSNS"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.sns_to_slack.function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.alerts.arn
 }
 
 # ==========================================
@@ -103,7 +156,11 @@ resource "aws_cloudwatch_dashboard" "easybank" {
   dashboard_body = jsonencode({
     widgets = [
       {
-        type = "metric"
+        type       = "metric"
+        x          = 0
+        y          = 0
+        width      = 6
+        height     = 6
         properties = {
           title       = "ECS CPU Utilization"
           metrics     = [["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.easybank.name, "ServiceName", aws_ecs_service.easybank.name]]
@@ -114,7 +171,11 @@ resource "aws_cloudwatch_dashboard" "easybank" {
         }
       },
       {
-        type = "metric"
+        type       = "metric"
+        x          = 6
+        y          = 0
+        width      = 6
+        height     = 6
         properties = {
           title       = "ECS Memory Utilization"
           metrics     = [["AWS/ECS", "MemoryUtilization", "ClusterName", aws_ecs_cluster.easybank.name, "ServiceName", aws_ecs_service.easybank.name]]
@@ -125,7 +186,11 @@ resource "aws_cloudwatch_dashboard" "easybank" {
         }
       },
       {
-        type = "metric"
+        type       = "metric"
+        x          = 0
+        y          = 6
+        width      = 6
+        height     = 6
         properties = {
           title       = "RDS CPU Utilization"
           metrics     = [["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", aws_db_instance.easybank.id]]
@@ -136,7 +201,11 @@ resource "aws_cloudwatch_dashboard" "easybank" {
         }
       },
       {
-        type = "metric"
+        type       = "metric"
+        x          = 6
+        y          = 6
+        width      = 6
+        height     = 6
         properties = {
           title       = "ALB 5XX Errors"
           metrics     = [["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", aws_lb.easybank.arn_suffix]]
