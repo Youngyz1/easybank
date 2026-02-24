@@ -77,3 +77,26 @@ resource "aws_route53_record" "easybank_www" {
     evaluate_target_health = true
   }
 }
+
+# ==========================================
+# SES Domain Verification
+# ==========================================
+resource "aws_ses_domain_identity" "easybank" {
+  domain = "ofiliyoungyz.site"
+}
+
+resource "aws_route53_record" "ses_verification" {
+  zone_id = aws_route53_zone.easybank.zone_id
+  name    = "_amazonses.ofiliyoungyz.site"
+  type    = "TXT"
+  ttl     = 300
+  records = [aws_ses_domain_identity.easybank.verification_token]
+}
+
+resource "aws_ses_domain_identity_verification" "easybank" {
+  domain = aws_ses_domain_identity.easybank.domain
+
+  depends_on = [aws_route53_record.ses_verification]
+}
+
+# ================

@@ -20,26 +20,25 @@
  *
  */
 
+
 session_start();
 
-require_once('__SRC__/secure_data.php'); // your existing input sanitization
-require 'vendor/autoload.php'; // AWS SDK for PHP
+require_once('__SRC__/secure_data.php');
+require 'vendor/autoload.php';
 
 use Aws\Ses\SesClient;
 use Aws\Exception\AwsException;
 
-// SES Client
 $ses = new SesClient([
     'version' => '2010-12-01',
-    'region'  => 'us-east-1', // change if needed
+    'region'  => 'us-east-1',
 ]);
 
 $error_msg = '';
-$step = 1;
+$step = isset($_SESSION['pin']) ? 2 : 1;
 
 // Handle Step 1: Capture user info and send PIN
 if (isset($_POST['submit_step1'])) {
-
     if (class_exists('SECURE_INPUT_DATA_AVAILABLE')) {
         $obj_secure_data = new SECURE_INPUT_DATA;
 
@@ -48,42 +47,39 @@ if (isset($_POST['submit_step1'])) {
         $area_code     = $obj_secure_data->SECURE_DATA_ENTER($_POST['area_code']);
         $mobile_number = $obj_secure_data->SECURE_DATA_ENTER($_POST['mobile']);
 
-        $_SESSION['email']         = $email;
-        $_SESSION['password']      = md5($password);
+        $_SESSION['email']            = $email;
+        $_SESSION['password']         = md5($password);
         $_SESSION['symbol_area_code'] = '+';
-        $_SESSION['area_code']     = "+" . $area_code;
-        $_SESSION['mobile_number'] = $mobile_number;
+        $_SESSION['area_code']        = "+" . $area_code;
+        $_SESSION['mobile_number']    = $mobile_number;
 
-        // Generate a 6-digit PIN
         $pin = rand(100000, 999999);
         $_SESSION['pin'] = $pin;
 
-        // Send PIN via SES
         try {
-            $result = $ses->sendEmail([
+            $ses->sendEmail([
                 'Destination' => [
                     'ToAddresses' => [$email],
                 ],
                 'Message' => [
                     'Body' => [
                         'Text' => [
-                            'Data' => "Your EasyBank verification PIN is: $pin",
+                            'Data'    => "Your EasyBank verification PIN is: $pin",
                             'Charset' => 'UTF-8',
                         ],
                     ],
                     'Subject' => [
-                        'Data' => 'EasyBank Account Verification PIN',
+                        'Data'    => 'EasyBank Account Verification PIN',
                         'Charset' => 'UTF-8',
                     ],
                 ],
-                'Source' => 'ofiliyoungyz@gmail.com', // verified SES sender
+                'Source' => 'noreply@ofiliyoungyz.site',
             ]);
+            $step = 2;
         } catch (AwsException $e) {
             $error_msg = "Failed to send verification email: " . $e->getAwsErrorMessage();
-        }
-
-        if (!$error_msg) {
-            $step = 2; // Move to PIN verification
+            unset($_SESSION['pin']);
+            $step = 1;
         }
     }
 }
@@ -94,8 +90,7 @@ if (isset($_POST['submit_pin'])) {
     if (isset($_SESSION['pin']) && $entered_pin == $_SESSION['pin']) {
         $_SESSION['step1'] = true;
         $_SESSION['step2'] = true;
-        unset($_SESSION['pin']); // remove PIN after successful verification
-        // Redirect to next registration step or dashboard
+        unset($_SESSION['pin']);
         echo "<script>location.href='page-register2.php';</script>";
         exit;
     } else {
@@ -116,6 +111,7 @@ if (isset($_POST['submit_pin'])) {
 <body>
 <div class="container" style="margin-top:50px; max-width:600px;">
     <h2 align="center">EasyBank Registration</h2>
+
     <?php if ($error_msg): ?>
         <div class="alert alert-danger"><?= htmlspecialchars($error_msg) ?></div>
     <?php endif; ?>
@@ -144,7 +140,7 @@ if (isset($_POST['submit_pin'])) {
     <?php elseif ($step == 2): ?>
         <form method="post">
             <div class="form-group">
-                <label>Enter the PIN sent to <?= htmlspecialchars($_SESSION['email']) ?></label>
+                <label>Enter the PIN sent to <?= htmlspecialchars($_SESSION['email'] ?? '') ?></label>
                 <input type="text" class="form-control" name="verification_pin" required pattern="[0-9]{6}">
             </div>
             <button type="submit" name="submit_pin" class="btn btn-success btn-block">Verify PIN</button>
