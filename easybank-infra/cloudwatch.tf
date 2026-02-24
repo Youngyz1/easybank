@@ -105,51 +105,45 @@ resource "aws_cloudwatch_dashboard" "easybank" {
       {
         type = "metric"
         properties = {
-          title  = "ECS CPU Utilization"
-          metrics = [
-            ["AWS/ECS", "CPUUtilization",
-              "ClusterName", aws_ecs_cluster.easybank.name,
-              "ServiceName", aws_ecs_service.easybank.name]
-          ]
-          period = 60
-          stat   = "Average"
+          title       = "ECS CPU Utilization"
+          metrics     = [["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.easybank.name, "ServiceName", aws_ecs_service.easybank.name]]
+          period      = 60
+          stat        = "Average"
+          region      = var.aws_region
+          annotations = []
         }
       },
       {
         type = "metric"
         properties = {
-          title  = "ECS Memory Utilization"
-          metrics = [
-            ["AWS/ECS", "MemoryUtilization",
-              "ClusterName", aws_ecs_cluster.easybank.name,
-              "ServiceName", aws_ecs_service.easybank.name]
-          ]
-          period = 60
-          stat   = "Average"
+          title       = "ECS Memory Utilization"
+          metrics     = [["AWS/ECS", "MemoryUtilization", "ClusterName", aws_ecs_cluster.easybank.name, "ServiceName", aws_ecs_service.easybank.name]]
+          period      = 60
+          stat        = "Average"
+          region      = var.aws_region
+          annotations = []
         }
       },
       {
         type = "metric"
         properties = {
-          title  = "RDS CPU Utilization"
-          metrics = [
-            ["AWS/RDS", "CPUUtilization",
-              "DBInstanceIdentifier", aws_db_instance.easybank.id]
-          ]
-          period = 60
-          stat   = "Average"
+          title       = "RDS CPU Utilization"
+          metrics     = [["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", aws_db_instance.easybank.id]]
+          period      = 60
+          stat        = "Average"
+          region      = var.aws_region
+          annotations = []
         }
       },
       {
         type = "metric"
         properties = {
-          title  = "ALB 5XX Errors"
-          metrics = [
-            ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count",
-              "LoadBalancer", aws_lb.easybank.arn_suffix]
-          ]
-          period = 60
-          stat   = "Sum"
+          title       = "ALB 5XX Errors"
+          metrics     = [["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", aws_lb.easybank.arn_suffix]]
+          period      = 60
+          stat        = "Sum"
+          region      = var.aws_region
+          annotations = []
         }
       }
     ]
