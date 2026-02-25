@@ -80,7 +80,7 @@ if(!isset($_SESSION['login']) || $_SESSION['login'] !== 'easybank'){
             <div class="card">
                 <h3><i class="glyphicon glyphicon-user"></i> User Management</h3>
                 <p>Manage customer accounts and activation</p>
-                <a href="activate-users.php" class="btn btn-primary btn-block">Manage Users</a>
+                <a href="/activate-users.php" class="btn btn-primary btn-block">Manage Users</a>
             </div>
         </div>
 
