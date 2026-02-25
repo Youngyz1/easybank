@@ -245,20 +245,48 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Get RDS Endpoint
+        id: rds
+        run: |
+          # First, try to get RDS endpoint from secret (most reliable)
+          if [ -n "${{ secrets.RDS_ENDPOINT }}" ]; then
+            RDS_ENDPOINT="${{ secrets.RDS_ENDPOINT }}"
+            echo "Using RDS endpoint from secrets"
+          else
+            # Fallback: try to auto-detect from AWS
+            echo "RDS_ENDPOINT secret not set, attempting auto-detection..."
+            RDS_ENDPOINT=$(aws rds describe-db-instances \
+              --query 'DBInstances[0].Endpoint.Address' \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -z "$RDS_ENDPOINT" ] || [ "$RDS_ENDPOINT" == "None" ]; then
+              echo "ERROR: Could not find RDS endpoint"
+              exit 1
+            fi
+            echo "Auto-detected RDS endpoint"
+          fi
+          
+          echo "RDS_ENDPOINT=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
+          echo "Using RDS endpoint: $RDS_ENDPOINT"
+
+      - name: Install MySQL Client
+        run: |
+          apt-get update
+          apt-get install -y mysql-client
+
       - name: Run Database Setup
         run: |
-          # Get your RDS endpoint from Terraform outputs or AWS CLI
-          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier easybank-db --query 'DBInstances[0].Endpoint.Address' --output text)
-          
-          # Execute setup.php via a container or direct connection
-          docker run --rm \
-            -e DB_HOST="$RDS_ENDPOINT" \
-            -e DB_USER="${{ secrets.RDS_USERNAME }}" \
-            -e DB_PASSWORD="${{ secrets.TF_VAR_DB_PASSWORD }}" \
-            -e DB_NAME="easybank" \
-            -v $(pwd):/app \
-            php:8.1-cli \
-            php /app/setup.php
+          mysql -h ${{ steps.rds.outputs.RDS_ENDPOINT }} \
+            -u admin \
+            -p"${{ secrets.TF_VAR_DB_PASSWORD }}" \
+            easybank < setup.sql
+
+      - name: Verify Tables Created
+        run: |
+          mysql -h ${{ steps.rds.outputs.RDS_ENDPOINT }} \
+            -u admin \
+            -p"${{ secrets.TF_VAR_DB_PASSWORD }}" \
+            easybank -e "SHOW TABLES;"
 
       - name: Notify Slack - Database Setup
         if: always()
@@ -268,6 +296,7 @@ jobs:
           message: |
             *EasyBank Database Setup*
             Status: ${{ job.status }}
+            RDS Endpoint: ${{ steps.rds.outputs.RDS_ENDPOINT }}
             Triggered by: ${{ github.actor }}
             Commit: ${{ github.sha }}
         env:
