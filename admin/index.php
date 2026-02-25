@@ -20,6 +20,27 @@
 
 session_start();
 
+// Check if already logged in
+if (isset($_SESSION['login']) && $_SESSION['login'] === 'easybank') {
+    header('Location: home.php');
+    exit;
+}
+
+$error = '';
+
+if (isset($_POST['submit'])) {
+    $admin_pass = getenv("ADMIN_PASSWORD") ?: "easybank";
+    $password = $_POST['password'];
+
+    if (password_verify($password, $admin_pass) || $password === $admin_pass) {
+        $_SESSION['login'] = "easybank";
+        header('Location: home.php');
+        exit;
+    } else {
+        $error = "Sign in control panel error";
+    }
+}
+
 ?>
 
 <html>
@@ -51,10 +72,16 @@ body{
     </font>
     </div>
 
+    <?php if($error): ?>
+      <div class="alert alert-danger">
+        <strong>Error!</strong> <?php echo $error; ?>
+      </div>
+    <?php endif; ?>
+
     <div class="row">
       <form action="" method="post">
         <div class="input-group col-xs-9 col-sm-9 col-md-9">
-          <input type="password" placeholder="Password" name="password" class="form-control">
+          <input type="password" placeholder="Password" name="password" class="form-control" required autocomplete="current-password">
           <div class="input-group-btn">
             <button class="btn btn-md btn-default btn-block" name="submit">
               <span class="glyphicon glyphicon-arrow-right"></span>
@@ -67,19 +94,3 @@ body{
 </div>
 </body>
 </html>
-
-<?php
-
-if (isset($_POST['submit'])) {
-    $admin_pass = getenv("ADMIN_PASSWORD") ?: "easybank";
-    $password = $_POST['password'];
-
-    if (password_verify($password, $admin_pass) || $password === $admin_pass) {
-        $_SESSION['login'] = "easybank";
-        header('Location: home.php');
-        exit;
-    } else {
-        echo '<script type="text/javascript">alert("Sign in control panel error");</script>';
-    }
-}
-?>
