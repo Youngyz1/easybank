@@ -289,8 +289,8 @@ window.onload=changeHashOnLoad;
 
 <?php
 
-error_reporting(E_ALL | E_WARNING | E_NOTICE);
-ini_set('display_errors', TRUE);
+error_reporting(0);
+ini_set('display_errors', FALSE);
 
 
    if (isset($_POST['submit_step3']))

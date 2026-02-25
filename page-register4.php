@@ -16,8 +16,8 @@ $SesClient = new SesClient([
     'region'  => 'us-east-1',
 ]);
 
-error_reporting(E_ALL | E_WARNING | E_NOTICE);
-ini_set('display_errors', TRUE);
+error_reporting(0);
+ini_set('display_errors', FALSE);
 
 if(isset($_POST['submit_end'])) {
     require_once('__SRC__/secure_data.php');

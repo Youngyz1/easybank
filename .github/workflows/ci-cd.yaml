@@ -23,6 +23,9 @@ env:
   TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
   TF_VAR_slack_webhook_url: ${{ secrets.TF_VAR_SLACK_WEBHOOK_URL }}
   ECR_REPO_NAME: easybank
+  TF_VAR_admin_password: ${{ secrets.TF_VAR_ADMIN_PASSWORD }}
+  TF_VAR_stripe_secret_key: ${{ secrets.TF_VAR_STRIPE_SECRET_KEY }}
+  TF_VAR_stripe_public_key: ${{ secrets.TF_VAR_STRIPE_PUBLIC_KEY }}
 
 jobs:
 # ============================================================

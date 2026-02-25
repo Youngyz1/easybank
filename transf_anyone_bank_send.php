@@ -50,8 +50,8 @@ if (time()-$_SESSION['timestamp']>$idletime)
   if (isset($_POST['transfer_anyone_bank'])) 
       {
 
-error_reporting(E_ALL | E_WARNING | E_NOTICE);
-ini_set('display_errors', TRUE);
+error_reporting(0);
+ini_set('display_errors', FALSE);
 
 
     require_once('__SRC__/connect.php');

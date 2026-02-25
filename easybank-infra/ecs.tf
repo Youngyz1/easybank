@@ -121,6 +121,20 @@ resource "aws_ecs_task_definition" "easybank" {
         {
           name      = "DB_NAME"
           valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:dbname::"
+        },
+        {
+          name      = "ADMIN_PASSWORD"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:admin_password::"
+        },
+        {
+          # ✅ Stripe secret key from Secrets Manager
+          name      = "STRIPE_SECRET_KEY"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:stripe_secret_key::"
+        },
+        {
+          # ✅ Stripe public key from Secrets Manager
+          name      = "STRIPE_PUBLIC_KEY"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:stripe_public_key::"
         }
       ]
 

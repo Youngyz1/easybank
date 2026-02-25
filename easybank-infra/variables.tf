@@ -69,3 +69,9 @@ variable "slack_webhook_url" {
   type        = string
   sensitive   = true
 }
+
+variable "admin_password" {
+  description = "Admin panel password"
+  type        = string
+  sensitive   = true
+}

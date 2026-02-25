@@ -400,7 +400,7 @@ countdown( "countdown", 15, 0 );
              <i class="fa fa-close"></i>
            </button>
               &nbsp;
-           <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
+           
            <button type="submit" class="btn btn-default btn-primary btn-lg" data-dismiss="modal"  onclick="window.location.href='logout.php'"/> Logout
             <i class="fa fa-check"></i>
           </button>

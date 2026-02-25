@@ -17,6 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 session_start();
+
+// ✅ Load CSRF helper
+require_once('__SRC__/csrf.php');
 ?>
 
 <!doctype html>
@@ -66,6 +69,9 @@ session_start();
                         <font color="black"><b><i>&dollar; &dollar; EASYBANK &euro; &euro;</i></b></font>
                     </h3>
                     <hr>
+
+                    <!-- ✅ Real PHP CSRF token -->
+                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
 
                     <div class="form-group">
                         <label>Email address</label>
@@ -122,31 +128,34 @@ session_start();
 </html>
 
 <?php
-error_reporting(E_ALL | E_WARNING | E_NOTICE);
-ini_set('display_errors', TRUE);
+error_reporting(0);
+ini_set('display_errors', FALSE);
 
 if (isset($_POST['submit_login'])) {
+
+    // ✅ Verify CSRF token before processing anything
+    verify_csrf_token();
+
     require_once('__SRC__/secure_data.php');
 
     if (class_exists('SECURE_INPUT_DATA_AVAILABLE')) {
         $obj_secure_data = new SECURE_INPUT_DATA;
 
-        $email = $obj_secure_data->SECURE_DATA_ENTER($_POST['email']);
+        $email    = $obj_secure_data->SECURE_DATA_ENTER($_POST['email']);
         $password = $obj_secure_data->SECURE_DATA_ENTER($_POST['password']);
-        $pin = $obj_secure_data->SECURE_DATA_ENTER($_POST['pin']);
+        $pin      = preg_replace('/[^0-9]/', '', $_POST['pin']);
 
         require_once('__SRC__/connect.php');
 
         if (class_exists('DATABASE_CONNECT')) {
             $obj_conn = new DATABASE_CONNECT;
-            $conn = $obj_conn->get_connection();
+            $conn     = $obj_conn->get_connection();
 
-            // Hash both password and PIN before checking
-            $email = $conn->real_escape_string($email);
+            $email          = $conn->real_escape_string($email);
             $password_hashed = md5($conn->real_escape_string($password));
-            $pin_plain = $conn->real_escape_string($pin);
+            $pin_plain       = $conn->real_escape_string($pin);
 
-            $sql = "SELECT email, password, pin, account_type FROM customers WHERE email='$email'";
+            $sql    = "SELECT email, password, pin, account_type FROM customers WHERE email='$email'";
             $result = $conn->query($sql);
 
             if ($result && $result->num_rows == 1) {
@@ -166,7 +175,7 @@ if (isset($_POST['submit_login'])) {
                             </button>
                             <strong>Your login password is invalid.</strong>
                           </div>";
-                } elseif ($row['pin'] != $pin_plain) {
+                } elseif ($row['pin'] != md5($pin_plain)) {
                     echo "<div class='alert alert-danger' role='alert'>
                             <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
                                 <span aria-hidden='true'>&times;</span>
@@ -174,8 +183,15 @@ if (isset($_POST['submit_login'])) {
                             <strong>Your login PIN is invalid.</strong>
                           </div>";
                 } else {
-                    $_SESSION['login'] = $email;
+                    // ✅ Regenerate session ID on successful login — prevents session fixation
+                    session_regenerate_id(true);
+
+                    $_SESSION['login']     = $email;
                     $_SESSION['timestamp'] = time();
+
+                    // ✅ Regenerate CSRF token after login for a fresh session
+                    unset($_SESSION['csrf_token']);
+
                     echo "<script>location.href='home.php'</script>";
                 }
             } else {

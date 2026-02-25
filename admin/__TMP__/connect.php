@@ -1,5 +1,4 @@
 <?php
-
 /*
  * Copyright (c) 2018 Barchampas Gerasimos <makindosx@gmail.com>
  * online-banking a online banking system for local businesses.
@@ -9,7 +8,6 @@
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- *
  * online-banking is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
@@ -17,38 +15,26 @@
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
- *
  */
 
+class DATABASE_CONNECT
+{
+    public $connect = array();
 
- class DATABASE_CONNECT
- {
+    public function __construct()
+    {
+        $this->connect[0] = getenv("DB_HOST") ?: "localhost";
+        $this->connect[1] = getenv("DB_USER") ?: "easybank";
+        $this->connect[2] = getenv("DB_PASS") ?: "easybank";
+        $this->connect[3] = getenv("DB_NAME") ?: "easybank";
+    }
 
- public $connect = array();
-
- public function __construct()
- {
-
-  $this->connect[0] = "localhost";
-  $this->connect[1] = "easybank";
-  $this->connect[2] = "easybank";
-  $this->connect[3] = "easybank";
-  
-  }
-
-
-
-public function __destruct()
-  {
-  $this->connect[0] = null;
-  $this->connect[1] = null;
-  $this->connect[2] = null;
-  $this->connect[3] = null;
-   }
-
-
-  }
-
+    public function __destruct()
+    {
+        $this->connect[0] = null;
+        $this->connect[1] = null;
+        $this->connect[2] = null;
+        $this->connect[3] = null;
+    }
+}
 ?>
-
-
