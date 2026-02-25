@@ -18,7 +18,7 @@ if(!isset($_SESSION['step1']) || !isset($_SESSION['step2']) || !isset($_SESSION[
 /* ===============================
    LOAD AWS SDK
 ================================= */
-require __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
 use Aws\Ses\SesClient;
 use Aws\Exception\AwsException;

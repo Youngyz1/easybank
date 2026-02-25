@@ -226,3 +226,49 @@ jobs:
             URL: https://ofiliyoungyz.site
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+# ============================================================
+# JOB 5: SETUP DATABASE
+# ============================================================
+  setup-database:
+    name: Setup Database Tables
+    runs-on: ubuntu-latest
+    needs: deploy-ecs
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run Database Setup
+        run: |
+          # Get your RDS endpoint from Terraform outputs or AWS CLI
+          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier easybank-db --query 'DBInstances[0].Endpoint.Address' --output text)
+          
+          # Execute setup.php via a container or direct connection
+          docker run --rm \
+            -e DB_HOST="$RDS_ENDPOINT" \
+            -e DB_USER="${{ secrets.RDS_USERNAME }}" \
+            -e DB_PASSWORD="${{ secrets.TF_VAR_DB_PASSWORD }}" \
+            -e DB_NAME="easybank" \
+            -v $(pwd):/app \
+            php:8.1-cli \
+            php /app/setup.php
+
+      - name: Notify Slack - Database Setup
+        if: always()
+        uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          message: |
+            *EasyBank Database Setup*
+            Status: ${{ job.status }}
+            Triggered by: ${{ github.actor }}
+            Commit: ${{ github.sha }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
