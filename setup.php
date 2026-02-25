@@ -1,8 +1,7 @@
 <?php
 // setup.php
-require_once('__SRC__/connect.php'); // make sure this points to your DATABASE_CONNECT class
+require_once('__SRC__/connect.php');
 
-// Connect to the database
 $obj_conn = new DATABASE_CONNECT();
 $conn = new mysqli(
     $obj_conn->connect[0],
@@ -15,12 +14,22 @@ if ($conn->connect_error) {
     die("Database connection failed: " . $conn->connect_error);
 }
 
-// Create 'customers' table if it doesn't exist
+// Create 'customers' table matching page-register4.php requirements
 $sql = "CREATE TABLE IF NOT EXISTS customers (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    fullname VARCHAR(100) NOT NULL,
+    firstname VARCHAR(100) NOT NULL,
+    lastname VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
+    pin VARCHAR(255) NOT NULL,
+    account_number BIGINT NOT NULL UNIQUE,
+    IBAN VARCHAR(50) NOT NULL UNIQUE,
+    identity_back_name VARCHAR(255),
+    identity_back_type VARCHAR(100),
+    identity_back_size INT,
+    identity_back_data LONGBLOB,
+    instant_register TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_instant_register VARCHAR(45),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )";
 
@@ -30,27 +39,5 @@ if ($conn->query($sql) === TRUE) {
     echo "Error creating table: " . $conn->error . "\n";
 }
 
-// Optional: insert a test user (password hashed)
-$testName = "Test User";
-$testEmail = "test@example.com";
-$testPassword = password_hash("password123", PASSWORD_DEFAULT);
-
-// Check if test user exists
-$stmt = $conn->prepare("SELECT id FROM customers WHERE email = ?");
-$stmt->bind_param("s", $testEmail);
-$stmt->execute();
-$stmt->store_result();
-
-if ($stmt->num_rows === 0) {
-    $stmt->close();
-    $stmt = $conn->prepare("INSERT INTO customers (fullname, email, password) VALUES (?, ?, ?)");
-    $stmt->bind_param("sss", $testName, $testEmail, $testPassword);
-    $stmt->execute();
-    echo "Test user inserted.\n";
-} else {
-    echo "Test user already exists.\n";
-}
-
-$stmt->close();
 $conn->close();
 ?>
