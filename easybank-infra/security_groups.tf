@@ -99,3 +99,14 @@ resource "aws_security_group_rule" "app_to_rds" {
   security_group_id        = aws_security_group.rds_sg.id
   source_security_group_id = aws_security_group.app_sg.id
 }
+
+# GitHub Actions → RDS (for CI/CD pipeline)
+resource "aws_security_group_rule" "github_to_rds" {
+  type              = "ingress"
+  from_port         = 3306
+  to_port           = 3306
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]  # Allow from anywhere for CI/CD
+  security_group_id = aws_security_group.rds_sg.id
+  description       = "Allow MySQL from GitHub Actions"
+}
