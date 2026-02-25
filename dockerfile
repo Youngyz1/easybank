@@ -42,12 +42,12 @@ RUN composer install \
 COPY __ROOT__/ /var/www/html/
 COPY __SRC__/ /var/www/html/__SRC__/
 COPY assets/ /var/www/html/assets/
+COPY admin/ /var/www/html/admin/
 COPY mail/ /var/www/html/mail/
 COPY fpdf/ /var/www/html/fpdf/
 COPY widrawals/ /var/www/html/widrawals/
 COPY images/ /var/www/html/images/
 COPY *.php /var/www/html/
-COPY admin/ /var/www/html/admin/
 
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html

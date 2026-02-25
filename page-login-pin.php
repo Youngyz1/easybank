@@ -7,11 +7,11 @@ $success = '';
 if($_SERVER['REQUEST_METHOD'] == 'POST'){
     require_once('__SRC__/connect.php');
     
-    $email = mysqli_real_escape_string($GLOBALS['conn'], $_POST['email']);
-    $pin = md5($_POST['pin']);
-    
     $obj_conn = new DATABASE_CONNECT;
     $conn = $obj_conn->get_connection();
+    
+    $email = mysqli_real_escape_string($conn, $_POST['email']);
+    $pin = md5($_POST['pin']);
     
     // Check if account exists, PIN matches, AND is active
     $sql = "SELECT id, firstname, email, account_number, IBAN, is_active FROM customers WHERE email='$email' AND pin='$pin'";
