@@ -230,74 +230,74 @@ jobs:
 # ============================================================
 # JOB 5: SETUP DATABASE
 # ============================================================
-  setup-database:
-    name: Setup Database Tables
-    runs-on: ubuntu-latest
-    needs: deploy-ecs
+  # setup-database:
+  #   name: Setup Database Tables
+  #   runs-on: ubuntu-latest
+  #   needs: deploy-ecs
 
-    steps:
-      - uses: actions/checkout@v4
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-region: ${{ env.AWS_REGION }}
 
-      - name: Get RDS Endpoint
-        id: rds
-        run: |
-          # First, try to get RDS endpoint from secret (most reliable)
-          if [ -n "${{ secrets.RDS_ENDPOINT }}" ]; then
-            RDS_ENDPOINT="${{ secrets.RDS_ENDPOINT }}"
-            echo "Using RDS endpoint from secrets"
-          else
-            # Fallback: try to auto-detect from AWS
-            echo "RDS_ENDPOINT secret not set, attempting auto-detection..."
-            RDS_ENDPOINT=$(aws rds describe-db-instances \
-              --query 'DBInstances[0].Endpoint.Address' \
-              --output text 2>/dev/null || echo "")
+  #     - name: Get RDS Endpoint
+  #       id: rds
+  #       run: |
+  #         # First, try to get RDS endpoint from secret (most reliable)
+  #         if [ -n "${{ secrets.RDS_ENDPOINT }}" ]; then
+  #           RDS_ENDPOINT="${{ secrets.RDS_ENDPOINT }}"
+  #           echo "Using RDS endpoint from secrets"
+  #         else
+  #           # Fallback: try to auto-detect from AWS
+  #           echo "RDS_ENDPOINT secret not set, attempting auto-detection..."
+  #           RDS_ENDPOINT=$(aws rds describe-db-instances \
+  #             --query 'DBInstances[0].Endpoint.Address' \
+  #             --output text 2>/dev/null || echo "")
             
-            if [ -z "$RDS_ENDPOINT" ] || [ "$RDS_ENDPOINT" == "None" ]; then
-              echo "ERROR: Could not find RDS endpoint"
-              exit 1
-            fi
-            echo "Auto-detected RDS endpoint"
-          fi
+  #           if [ -z "$RDS_ENDPOINT" ] || [ "$RDS_ENDPOINT" == "None" ]; then
+  #             echo "ERROR: Could not find RDS endpoint"
+  #             exit 1
+  #           fi
+  #           echo "Auto-detected RDS endpoint"
+  #         fi
           
-          echo "RDS_ENDPOINT=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
-          echo "Using RDS endpoint: $RDS_ENDPOINT"
+  #         echo "RDS_ENDPOINT=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
+  #         echo "Using RDS endpoint: $RDS_ENDPOINT"
 
-      - name: Install MySQL Client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mysql-client
+  #     - name: Install MySQL Client
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y mysql-client
 
-      - name: Run Database Setup
-        run: |
-          mysql -h ${{ steps.rds.outputs.RDS_ENDPOINT }} \
-            -u admin \
-            -p"${{ secrets.TF_VAR_DB_PASSWORD }}" \
-            easybank < setup.sql
+  #     - name: Run Database Setup
+  #       run: |
+  #         mysql -h ${{ steps.rds.outputs.RDS_ENDPOINT }} \
+  #           -u admin \
+  #           -p"${{ secrets.TF_VAR_DB_PASSWORD }}" \
+  #           easybank < setup.sql
 
-      - name: Verify Tables Created
-        run: |
-          mysql -h ${{ steps.rds.outputs.RDS_ENDPOINT }} \
-            -u admin \
-            -p"${{ secrets.TF_VAR_DB_PASSWORD }}" \
-            easybank -e "SHOW TABLES;"
+  #     - name: Verify Tables Created
+  #       run: |
+  #         mysql -h ${{ steps.rds.outputs.RDS_ENDPOINT }} \
+  #           -u admin \
+  #           -p"${{ secrets.TF_VAR_DB_PASSWORD }}" \
+  #           easybank -e "SHOW TABLES;"
 
-      - name: Notify Slack - Database Setup
-        if: always()
-        uses: act10ns/slack@v1
-        with:
-          status: ${{ job.status }}
-          message: |
-            *EasyBank Database Setup*
-            Status: ${{ job.status }}
-            RDS Endpoint: ${{ steps.rds.outputs.RDS_ENDPOINT }}
-            Triggered by: ${{ github.actor }}
-            Commit: ${{ github.sha }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  #     - name: Notify Slack - Database Setup
+  #       if: always()
+  #       uses: act10ns/slack@v1
+  #       with:
+  #         status: ${{ job.status }}
+  #         message: |
+  #           *EasyBank Database Setup*
+  #           Status: ${{ job.status }}
+  #           RDS Endpoint: ${{ steps.rds.outputs.RDS_ENDPOINT }}
+  #           Triggered by: ${{ github.actor }}
+  #           Commit: ${{ github.sha }}
+  #       env:
+  #         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
