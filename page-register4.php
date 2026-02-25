@@ -133,10 +133,22 @@ if(isset($_POST['submit_end'])) {
 
         echo "Registration complete. PIN sent to email.";
 
+        // Clear session data
+        unset($_SESSION['step1']);
+        unset($_SESSION['step2']);
+        unset($_SESSION['step3']);
+        unset($_SESSION['first_name']);
+        unset($_SESSION['last_name']);
+        unset($_SESSION['email']);
+        unset($_SESSION['password']);
+        
+        // Redirect to PIN login page
+        header('Location: page-login-pin.php');
+        exit;
+
     } catch (AwsException $e) {
         echo "Email failed: " . $e->getMessage();
     }
-
 }
 ?>
 
