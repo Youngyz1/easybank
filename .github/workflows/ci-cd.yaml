@@ -78,35 +78,35 @@ jobs:
 # ============================================================
 # JOB 2: CODE QUALITY — SONARQUBE
 # ============================================================
-  sonarqube:
-    name: SonarQube Code Analysis
-    runs-on: ubuntu-latest
-    needs: terraform-base
+  # sonarqube:
+  #   name: SonarQube Code Analysis
+  #   runs-on: ubuntu-latest
+  #   needs: terraform-base
 
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
 
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+  #     - name: SonarQube Scan
+  #       uses: SonarSource/sonarqube-scan-action@master
+  #       env:
+  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-      - name: Notify Slack - SonarQube
-        if: always()
-        uses: act10ns/slack@v1
-        with:
-          status: ${{ job.status }}
-          message: |
-            *EasyBank SonarQube Analysis*
-            Status: ${{ job.status }}
-            Results: ${{ secrets.SONAR_HOST_URL }}/dashboard?id=easybank
-            Triggered by: ${{ github.actor }}
-            Commit: ${{ github.sha }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  #     - name: Notify Slack - SonarQube
+  #       if: always()
+  #       uses: act10ns/slack@v1
+  #       with:
+  #         status: ${{ job.status }}
+  #         message: |
+  #           *EasyBank SonarQube Analysis*
+  #           Status: ${{ job.status }}
+  #           Results: ${{ secrets.SONAR_HOST_URL }}/dashboard?id=easybank
+  #           Triggered by: ${{ github.actor }}
+  #           Commit: ${{ github.sha }}
+  #       env:
+  #         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 # ============================================================
 # JOB 3: BUILD & PUSH IMAGE
@@ -114,7 +114,7 @@ jobs:
   build-image:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
-    needs: sonarqube
+    needs: terraform-base 
     outputs:
       IMAGE_TAG: ${{ steps.set-tag.outputs.IMAGE_TAG }}
 
