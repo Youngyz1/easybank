@@ -93,11 +93,11 @@ if(isset($_POST['submit_end'])) {
     }
 
     $sql = "INSERT INTO customers 
-            (firstname, lastname, email, password, pin, account_number, IBAN, identity_back_name, identity_back_type, identity_back_size, identity_back_data, instant_register, ip_instant_register)
+            (firstname, lastname, email, password, pin, account_number, IBAN, identity_back_name, identity_back_type, identity_back_size, identity_back_data, instant_register, ip_instant_register, is_active)
             VALUES
             ('$first_name','$last_name','$email','$password','$pin_hashed','$account_number','$IBAN',
              '$identity_back_name','$identity_back_type','$identity_back_size','$identity_back_data',
-             NOW(),'$ip_instant_register')";
+             NOW(),'$ip_instant_register', 0)";
 
     if(!$conn->query($sql)){
         die("Database insert failed: " . $conn->error);
@@ -120,11 +120,11 @@ if(isset($_POST['submit_end'])) {
                 ],
                 'Body' => [
                     'Html' => [
-                        'Data' => "<h3>Hello $first_name</h3><p>Your PIN is: <b>$pin</b></p>",
+                        'Data' => "<h3>Hello $first_name</h3><p>Your PIN is: <b>$pin</b></p><p>Your account will be activated by our admin team shortly.</p>",
                         'Charset' => 'UTF-8'
                     ],
                     'Text' => [
-                        'Data' => "Hello $first_name, your PIN is: $pin",
+                        'Data' => "Hello $first_name, your PIN is: $pin\nYour account will be activated by our admin team shortly.",
                         'Charset' => 'UTF-8'
                     ]
                 ],
