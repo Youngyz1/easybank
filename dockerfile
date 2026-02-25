@@ -47,6 +47,7 @@ COPY fpdf/ /var/www/html/fpdf/
 COPY widrawals/ /var/www/html/widrawals/
 COPY images/ /var/www/html/images/
 COPY *.php /var/www/html/
+COPY admin/ /var/www/html/admin/
 
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html
