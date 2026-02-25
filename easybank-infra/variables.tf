@@ -75,3 +75,20 @@ variable "admin_password" {
   type        = string
   sensitive   = true
 }
+
+# ==========================================
+# Stripe
+# ==========================================
+variable "stripe_secret_key" {
+  description = "Stripe live secret key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_public_key" {
+  description = "Stripe live public key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
