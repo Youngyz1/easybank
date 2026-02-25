@@ -14,6 +14,7 @@ resource "aws_db_subnet_group" "easybank" {
 # RDS Instance
 # ==========================================
 resource "aws_db_instance" "easybank" {
+  identifier             = "easybank-rds"
   engine                 = "mariadb"
   instance_class         = "db.t3.micro"
   allocated_storage      = 20
@@ -24,4 +25,9 @@ resource "aws_db_instance" "easybank" {
   db_subnet_group_name   = aws_db_subnet_group.easybank.name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
   skip_final_snapshot    = true
+  publicly_accessible    = true
+
+  tags = {
+    Name = "easybank-rds"
+  }
 }

@@ -41,3 +41,22 @@ output "nameservers" {
 output "sonarqube_url" {
   value = "http://${aws_instance.sonarqube.public_ip}:9000"
 }
+
+
+# ==========================================
+# RDS Outputs
+# ==========================================
+output "rds_endpoint" {
+  description = "RDS database endpoint"
+  value       = aws_db_instance.easybank.endpoint
+}
+
+output "rds_address" {
+  description = "RDS database address"
+  value       = aws_db_instance.easybank.address
+}
+
+output "rds_port" {
+  description = "RDS database port"
+  value       = aws_db_instance.easybank.port
+}
