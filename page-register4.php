@@ -131,8 +131,6 @@ if(isset($_POST['submit_end'])) {
             ],
         ]);
 
-        echo "Registration complete. PIN sent to email.";
-
         // Clear session data
         unset($_SESSION['step1']);
         unset($_SESSION['step2']);
@@ -142,12 +140,15 @@ if(isset($_POST['submit_end'])) {
         unset($_SESSION['email']);
         unset($_SESSION['password']);
         
-        // Redirect to PIN login page
+        // Redirect to PIN login page (NO ECHO BEFORE HEADER!)
         header('Location: page-login-pin.php');
         exit;
 
     } catch (AwsException $e) {
-        echo "Email failed: " . $e->getMessage();
+        // Store error in session instead of echoing
+        $_SESSION['error'] = "Email failed: " . $e->getMessage();
+        header('Location: page-register.php');
+        exit;
     }
 }
 ?>
@@ -228,10 +229,10 @@ if(isset($_POST['submit_end'])) {
                         <div class="container">
                             <div class="col-md-12">
                                 <div class="form-group">
-                                    <div align="center"><label>Back image of identity</label></div>
+                                    <div align="center"><label for="imgInp">Back image of identity</label></div>
                                     <div class="input-group">
                                         <span class="btn btn-default btn-file glyphicon glyphicon-open-file">
-                                            Browse… <input type="file" name="identity_back" id="imgInp" required>
+                                            Browse… <input type="file" name="identity_back" id="imgInp" required autocomplete="off">
                                         </span>
                                         <input type="text" class="form-control" readonly>
                                     </div>
