@@ -17,7 +17,7 @@ $message = '';
 // Activate user if requested
 if(isset($_GET['activate'])){
     $user_id = mysqli_real_escape_string($conn, $_GET['activate']);
-    $update_sql = "UPDATE customers SET is_active = 1 WHERE id = '$user_id'";
+    $update_sql = "UPDATE customers SET is_active = 1, account_type = 'active' WHERE id = '$user_id'";
     if($conn->query($update_sql)){
         $message = '<div class="alert alert-success">User activated successfully!</div>';
     } else {
@@ -28,7 +28,7 @@ if(isset($_GET['activate'])){
 // Deactivate user if requested
 if(isset($_GET['deactivate'])){
     $user_id = mysqli_real_escape_string($conn, $_GET['deactivate']);
-    $update_sql = "UPDATE customers SET is_active = 0 WHERE id = '$user_id'";
+    $update_sql = "UPDATE customers SET is_active = 0, account_type = 'inactive' WHERE id = '$user_id'";
     if($conn->query($update_sql)){
         $message = '<div class="alert alert-warning">User deactivated!</div>';
     }

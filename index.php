@@ -151,17 +151,17 @@ if (isset($_POST['submit_login'])) {
             $obj_conn = new DATABASE_CONNECT;
             $conn     = $obj_conn->get_connection();
 
-            $email          = $conn->real_escape_string($email);
+            $email           = $conn->real_escape_string($email);
             $password_hashed = md5($conn->real_escape_string($password));
             $pin_plain       = $conn->real_escape_string($pin);
 
-            $sql    = "SELECT email, password, pin, account_type FROM customers WHERE email='$email'";
+            $sql    = "SELECT email, password, pin, is_active FROM customers WHERE email='$email'";
             $result = $conn->query($sql);
 
             if ($result && $result->num_rows == 1) {
                 $row = $result->fetch_assoc();
 
-                if ($row['account_type'] != 'active') {
+                if ($row['is_active'] != 1) {
                     echo "<div class='alert alert-danger' role='alert'>
                             <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
                                 <span aria-hidden='true'>&times;</span>
