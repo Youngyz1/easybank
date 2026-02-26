@@ -7,7 +7,7 @@ if(!isset($_SESSION['login']) || $_SESSION['login'] !== 'easybank'){
     exit;
 }
 
-require_once('../__SRC__/connect.php');
+require_once('./__SRC__/connect.php');
 
 $obj_conn = new DATABASE_CONNECT;
 $conn = $obj_conn->get_connection();
@@ -74,7 +74,7 @@ $result = $conn->query($sql);
 </head>
 <body>
 <div class="container">
-    <a href="home.php" class="btn btn-secondary" style="margin-bottom: 20px;">
+    <a href="admin/home.php" class="btn btn-secondary" style="margin-bottom: 20px;">
         <i class="glyphicon glyphicon-arrow-left"></i> Back to Admin Home
     </a>
     
