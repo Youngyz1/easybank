@@ -730,7 +730,6 @@ $("input[type=password]").keyup(function(){
   //echo '</div>';
 
 
-  } // end of else connect
 
 
  } // end of connect class exist

@@ -551,7 +551,6 @@ countdown( "countdown", 15, 0 );
 
 
 
-         } // end of else connect
 
 
 
