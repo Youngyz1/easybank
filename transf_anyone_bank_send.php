@@ -9,7 +9,6 @@
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- *
  * online-banking is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
@@ -17,156 +16,104 @@
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
- *
  */
 
-   session_start();
+session_start();
 
-    
- if(!isset($_SESSION['login']))
-    {
-     header('Location: index.php');
-      }
+require_once('__SRC__/csrf.php');
 
+if (!isset($_SESSION['login'])) {
+    header('Location: index.php');
+    exit;
+}
 
-   else
-    {
+$idletime = 898;
 
-$idletime=898;//after 60 seconds the user gets logged out
-
-if (time()-$_SESSION['timestamp']>$idletime)
-   {
+if (time() - $_SESSION['timestamp'] > $idletime) {
     session_destroy();
     session_unset();
-     }
+    header('Location: index.php');
+    exit;
+} else {
+    $_SESSION['timestamp'] = time();
+}
 
-  else
-    {
-    $_SESSION['timestamp']=time();
-     }
+if (isset($_POST['transfer_anyone_bank'])) {
 
+    verify_csrf_token();
 
-
-  if (isset($_POST['transfer_anyone_bank'])) 
-      {
-
-error_reporting(0);
-ini_set('display_errors', FALSE);
-
+    error_reporting(0);
+    ini_set('display_errors', FALSE);
 
     require_once('__SRC__/connect.php');
+    require_once('__SRC__/secure_data.php');
 
+    if (class_exists('DATABASE_CONNECT') && class_exists('SECURE_INPUT_DATA_AVAILABLE')) {
 
-  if (class_exists('DATABASE_CONNECT'))
-       {
- 
-        $obj_conn  = new DATABASE_CONNECT;
-            
+        $obj_conn = new DATABASE_CONNECT;
         $conn = $obj_conn->get_connection();
-                 }
 
+        $obj_secure_data = new SECURE_INPUT_DATA;
 
-         else
-           {
+        // Get and sanitize inputs
+        $firstname        = $obj_secure_data->SECURE_DATA_ENTER($_POST['firstname']);
+        $lastname         = $obj_secure_data->SECURE_DATA_ENTER($_POST['lastname']);
+        $IBAN             = $obj_secure_data->SECURE_DATA_ENTER($_POST['IBAN']);
+        $main_amount      = $obj_secure_data->SECURE_DATA_ENTER($_POST['main_amount']);
+        $secondary_amount = $obj_secure_data->SECURE_DATA_ENTER($_POST['secondary_amount']);
+        $total_amount     = floatval($main_amount . "." . $secondary_amount);
 
-          require_once('__SRC__/secure_data.php');
+        $amount_reserve = 3;
+        $total_amount_with_reserve = $total_amount + $amount_reserve;
 
-          if (class_exists('SECURE_INPUT_DATA_AVAILABLE'))
-              {
+        // ✅ Get sender balance
+        $stmt = $conn->prepare("SELECT total_balance FROM accounts WHERE email = ?");
+        $stmt->bind_param("s", $_SESSION['login']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stmt->close();
 
-            $obj_secure_data = new SECURE_INPUT_DATA;
+        $row = $result->fetch_assoc();
+        $total_balance = floatval($row['total_balance']);
 
+        if ($total_amount_with_reserve > $total_balance) {
+            echo '<script type="text/javascript">alert("You do not have enough balance to do this transfer.");</script>';
+            exit;
+        }
 
-             // get personal details from user
+        // ✅ Deduct from sender
+        $stmt2 = $conn->prepare("UPDATE accounts SET 
+            amounts_transferred = amounts_transferred + ?, 
+            amounts_from_reserve = amounts_from_reserve + ?, 
+            total_balance = total_balance - ? 
+            WHERE email = ?");
+        $stmt2->bind_param("ddds", $total_amount, $amount_reserve, $total_amount_with_reserve, $_SESSION['login']);
+        $result2 = $stmt2->execute();
+        $stmt2->close();
 
-              $firstname          =   $obj_secure_data->SECURE_DATA_ENTER($_POST['firstname']);
-              $lastname           =   $obj_secure_data->SECURE_DATA_ENTER($_POST['lastname']);                 
-              $IBAN               =   $obj_secure_data->SECURE_DATA_ENTER($_POST['IBAN']);
-              $main_amount        =   $obj_secure_data->SECURE_DATA_ENTER($_POST['main_amount']);
-              $secondary_amount   =   $obj_secure_data->SECURE_DATA_ENTER($_POST['secondary_amount']);
-              $total_amount       =   $main_amount ."." .$secondary_amount;
-   
-   
-              
-              $sql = "select total_balance from accounts where email = '".$_SESSION['login']."' ";
-              $result  = $conn->query($sql);
- 
-                   while ($row = $result->fetch_assoc())
-                      {
+        // ✅ Add to recipient
+        $stmt3 = $conn->prepare("UPDATE accounts SET 
+            amounts_from_others = amounts_from_others + ?, 
+            total_balance = total_balance + ? 
+            WHERE firstname = ? AND lastname = ? AND IBAN = ?");
+        $stmt3->bind_param("ddss", $total_amount, $total_amount, $firstname, $lastname, $IBAN);
 
-                       $total_balance = $row['total_balance'];
-                      // $total_balance2 = number_format($total_balance, 2, '.', '');
-                       // echo $total_balance2;
-  
-                        $amount_reserve = 3;
-                        $total_amount_with_reserve = $total_amount + $amount_reserve;
+        // ✅ Fix: bind_param should have 5 params not 4 (dd + sss = 5)
+        $stmt3 = $conn->prepare("UPDATE accounts SET 
+            amounts_from_others = amounts_from_others + ?, 
+            total_balance = total_balance + ? 
+            WHERE firstname = ? AND lastname = ? AND IBAN = ?");
+        $stmt3->bind_param("ddsss", $total_amount, $total_amount, $firstname, $lastname, $IBAN);
+        $result3 = $stmt3->execute();
+        $stmt3->close();
 
-                         if ($total_amount_with_reserve > $total_balance)
-                            { 
-            echo '<script type="text/javascript">alert("You do not have enough balance to do this transfer.");
-                </script>';
-                              }
+        if ($result2 && $result3) {
+            echo '<script type="text/javascript">alert("Transfer completed successfully!"); location.href="transf_anyone_bank.php";</script>';
+        } else {
+            echo '<script type="text/javascript">alert("Transfer failed. Please try again.");</script>';
+        }
 
-
-                      else if ($total_amount_with_reserve <= $total_balance)
-                          {
-
-                 $sql2 = "update accounts set amounts_transferred = amounts_transferred + $total_amount,
-                          amounts_from_reserve = amounts_from_reserve + $amount_reserve,
-                          total_balance = total_balance - $total_amount_with_reserve
-                          where email = '".$_SESSION['login']."'";
-                 $result2  = $conn->query($sql2);
-
-
-                 $sql3 = "update accounts set amounts_from_others = amounts_from_others + $total_amount ,
-                          total_balance = total_balance + $total_amount
-                          where firstname = '$firstname' and lastname= '$lastname' and IBAN = '$IBAN' ";
-                 $result3  = $conn->query($sql3);
-                
-
-                          //  if ($result2 == true && $result3 == true)
-                                // {
-                            
-                                 // }
-               
-                              } // end of else
-
-
-                           else
-                             {
-                              exit;
-                              }
-        
-     
-                       } // end of while
-             
-
-
-            
-        
-
-
-
-                   //else
-                    // { 
-                      //exit;
-                       //}
-
-
-
-                } // end of secure data input
-
-
-               } // end of else for connect
-
-
-
-            } // end of if for calss exists
-
-
-        } // end of if isset post transfer button
-
-
-    } // end of else session login
-
+        $conn->close();
+    }
+}
 ?>

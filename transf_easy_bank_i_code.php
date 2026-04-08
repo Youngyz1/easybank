@@ -26,18 +26,21 @@
  if(!isset($_SESSION['login']))
     {
      header('Location: index.php');
+     exit;
       }
 
 
    else
     {
 
-$idletime=898;//after 60 seconds the user gets logged out
+$idletime=900;//after 15 minutes the user gets logged out
 
 if (time()-$_SESSION['timestamp']>$idletime)
    {
     session_destroy();
     session_unset();
+    header('Location: index.php');
+    exit;
      }
 
   else
@@ -174,8 +177,5 @@ if (time()-$_SESSION['timestamp']>$idletime)
       } // end of if isset post transfer button
 
 
-    } // end of else session login
-
-
-?>
+      ?>
 

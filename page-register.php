@@ -24,6 +24,7 @@
 session_start();
 
 require_once('__SRC__/secure_data.php');
+require_once('__SRC__/csrf.php');
 require 'vendor/autoload.php';
 
 use Aws\Ses\SesClient;
@@ -39,6 +40,8 @@ $step = isset($_SESSION['pin']) ? 2 : 1;
 
 // Handle Step 1: Capture user info and send PIN
 if (isset($_POST['submit_step1'])) {
+    verify_csrf_token();
+
     if (class_exists('SECURE_INPUT_DATA_AVAILABLE')) {
         $obj_secure_data = new SECURE_INPUT_DATA;
 
@@ -48,7 +51,7 @@ if (isset($_POST['submit_step1'])) {
         $mobile_number = $obj_secure_data->SECURE_DATA_ENTER($_POST['mobile']);
 
         $_SESSION['email']            = $email;
-        $_SESSION['password']         = md5($password);
+        $_SESSION['password']         = password_hash($password, PASSWORD_BCRYPT);
         $_SESSION['symbol_area_code'] = '+';
         $_SESSION['area_code']        = "+" . $area_code;
         $_SESSION['mobile_number']    = $mobile_number;
@@ -86,6 +89,8 @@ if (isset($_POST['submit_step1'])) {
 
 // Handle Step 2: Verify PIN
 if (isset($_POST['submit_pin'])) {
+    verify_csrf_token();
+
     $entered_pin = $_POST['verification_pin'] ?? '';
     if (isset($_SESSION['pin']) && $entered_pin == $_SESSION['pin']) {
         $_SESSION['step1'] = true;
@@ -118,6 +123,7 @@ if (isset($_POST['submit_pin'])) {
 
     <?php if ($step == 1): ?>
         <form method="post">
+            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
             <div class="form-group">
                 <label>Email address</label>
                 <input type="email" class="form-control" name="email" required>
@@ -139,6 +145,7 @@ if (isset($_POST['submit_pin'])) {
 
     <?php elseif ($step == 2): ?>
         <form method="post">
+            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
             <div class="form-group">
                 <label>Enter the PIN sent to <?= htmlspecialchars($_SESSION['email'] ?? '') ?></label>
                 <input type="text" class="form-control" name="verification_pin" required pattern="[0-9]{6}">

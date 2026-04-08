@@ -7,20 +7,55 @@ if (isset($_SESSION['login']) && $_SESSION['login'] === 'easybank') {
     exit;
 }
 
-$error = '';
+// Rate limiting: Track failed login attempts
+$max_attempts = 5;
+$lockout_time = 900; // 15 minutes
+
+if (!isset($_SESSION['admin_login_attempts'])) {
+    $_SESSION['admin_login_attempts'] = 0;
+    $_SESSION['admin_login_lockout'] = 0;
+}
+
+// Check if locked out
+if (time() < $_SESSION['admin_login_lockout']) {
+    $remaining = $_SESSION['admin_login_lockout'] - time();
+    $error = "Too many failed attempts. Try again in " . ceil($remaining / 60) . " minutes.";
+} else {
+    $error = '';
 
 if (isset($_POST['submit'])) {
     $admin_pass = getenv("ADMIN_PASSWORD") ?: "easybank";
     $password = $_POST['password'];
     
     // Simple plain text comparison
-    if ($password === $admin_pass) {
+    // Support both hashed and plain text passwords for backward compatibility
+        $admin_pass_hash = getenv("ADMIN_PASSWORD_HASH");
+        $admin_pass_plain = getenv("ADMIN_PASSWORD") ?: "easybank";
+        
+        $password_valid = false;
+        if ($admin_pass_hash && password_verify($password, $admin_pass_hash)) {
+            $password_valid = true;
+        } elseif ($password === $admin_pass_plain) {
+            $password_valid = true;
+        }
+        
+        if ($password_valid) {
         $_SESSION['login'] = "easybank";
         header('Location: home.php');
         exit;
     } else {
-        $error = "Sign in control panel error";
+        // Increment failed attempts
+        $_SESSION['admin_login_attempts']++;
+        
+        if ($_SESSION['admin_login_attempts'] >= $max_attempts) {
+            $_SESSION['admin_login_lockout'] = time() + $lockout_time;
+            $error = "Too many failed attempts. Locked for 15 minutes.";
+        } else {
+            $remaining = $max_attempts - $_SESSION['admin_login_attempts'];
+            $error = "Sign in control panel error. $remaining attempts remaining.";
+        }
     }
+}
 }
 ?>
 <!DOCTYPE html>

@@ -20,120 +20,183 @@
  *
  */
 
+session_start();
 
-  session_start();
+// FIX #1: Check authentication
+if(!isset($_SESSION['login'])) {
+    header('Location: index.php');
+    exit;  // CRITICAL: Must exit after redirect!
+}
 
-    
- if(!isset($_SESSION['login']))
-    {
-     header('Location: index.php');
-      }
+// FIX #2: Session timeout check at top level
+$idletime = 900; // 15 minutes
 
-
-   else
-    {
-
-$idletime=898;//after 60 seconds the user gets logged out
-
-if (time()-$_SESSION['timestamp']>$idletime)
-   {
+if (time() - $_SESSION['timestamp'] > $idletime) {
     session_destroy();
     session_unset();
-     }
+    header('Location: index.php');
+    exit;
+} else {
+    $_SESSION['timestamp'] = time();
+}
 
-  else
-    {
-    $_SESSION['timestamp']=time();
-     }
-
-
- if (isset($_POST['transfer_anyone_bank'])) 
-      {
+// FIX #3: CSRF Token validation
+if (isset($_POST['transfer_anyone_bank'])) {
+    
+    // Validate CSRF token
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        echo "<div class='alert alert-danger' role='alert'>
+                <strong>Security Error:</strong> Invalid request. Please try again.
+              </div>";
+        exit;
+    }
 
     require_once('__SRC__/connect.php');
 
+    // FIX #4: Proper database connection handling
+    if (!class_exists('DATABASE_CONNECT')) {
+        error_log("Database class not found");
+        echo "<div class='alert alert-danger' role='alert'>
+                <strong>System Error:</strong> Unable to connect to database.
+              </div>";
+        exit;
+    }
 
-  if (class_exists('DATABASE_CONNECT'))
-       {
- 
-        $obj_conn  = new DATABASE_CONNECT;
-            
-        $conn = $obj_conn->get_connection();
-                 }
+    $obj_conn = new DATABASE_CONNECT;
+    $conn = $obj_conn->get_connection();
 
+    if (!$conn) {
+        error_log("Database connection failed");
+        echo "<div class='alert alert-danger' role='alert'>
+                <strong>System Error:</strong> Database connection failed.
+              </div>";
+        exit;
+    }
 
-         else
-           {
+    // FIX #5: Input validation - ensure POST data exists and is valid
+    if (!isset($_POST['main_amount']) || !isset($_POST['secondary_amount'])) {
+        echo "<div class='alert alert-danger' role='alert'>
+                <strong>Error:</strong> Missing amount information.
+              </div>";
+        exit;
+    }
 
-          require_once('__SRC__/secure_data.php');
+    // Validate and sanitize amounts
+    $main_amount = filter_var($_POST['main_amount'], FILTER_VALIDATE_INT);
+    $secondary_amount = filter_var($_POST['secondary_amount'], FILTER_VALIDATE_INT);
 
-          if (class_exists('SECURE_INPUT_DATA_AVAILABLE'))
-              {
+    if ($main_amount === false || $main_amount <= 0) {
+        echo "<div class='alert alert-danger' role='alert'>
+                <strong>Error:</strong> Invalid main amount.
+              </div>";
+        exit;
+    }
 
-            $obj_secure_data = new SECURE_INPUT_DATA;
+    if ($secondary_amount === false || $secondary_amount < 0 || $secondary_amount > 99) {
+        echo "<div class='alert alert-danger' role='alert'>
+                <strong>Error:</strong> Invalid secondary amount (must be 0-99).
+              </div>";
+        exit;
+    }
 
+    // FIX #6: Use proper numeric calculation instead of string concatenation
+    $total_amount = $main_amount + ($secondary_amount / 100);
 
-            $main_amount       =   $obj_secure_data->SECURE_DATA_ENTER($_POST['main_amount']);
-            $secondary_amount  =   $obj_secure_data->SECURE_DATA_ENTER($_POST['secondary_amount']);
-            $total_amount      =   $main_amount .'.' .$secondary_amount;
+    // Sanitize email
+    $email = filter_var($_SESSION['login'], FILTER_SANITIZE_EMAIL);
 
+    // FIX #7: Use prepared statement to prevent SQL injection
+    $stmt = $conn->prepare("SELECT total_balance FROM accounts WHERE email = ?");
+    if (!$stmt) {
+        error_log("Prepare failed: " . $conn->error);
+        echo "<div class='alert alert-danger' role='alert'>
+                <strong>System Error:</strong> Database error occurred.
+              </div>";
+        exit;
+    }
 
+    $stmt->bind_param("s", $email);
+    if (!$stmt->execute()) {
+        error_log("Execute failed: " . $stmt->error);
+        echo "<div class='alert alert-danger' role='alert'>
+                <strong>System Error:</strong> Database error occurred.
+              </div>";
+        exit;
+    }
 
-        $sql = "select total_balance from accounts where  email = '".$_SESSION['login']."' ";
-        $result = $conn->query($sql);
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log("Get result failed: " . $stmt->error);
+        echo "<div class='alert alert-danger' role='alert'>
+                <strong>System Error:</strong> Database error occurred.
+              </div>";
+        exit;
+    }
 
+    // FIX #8: Proper error handling for no results
+    if ($result->num_rows === 0) {
+        error_log("Account not found: $email");
+        echo "<div class='alert alert-danger' role='alert'>
+                <strong>Error:</strong> Account not found.
+              </div>";
+        $stmt->close();
+        $conn->close();
+        exit;
+    }
 
-                  while  ($row = $result->fetch_assoc())
-                            {
-                       
-                            $amount_reserve = 3;
-                            $total_amount_with_reserve = $total_amount + $amount_reserve;
+    // Process the balance check
+    while ($row = $result->fetch_assoc()) {
+        
+        if (!isset($row['total_balance'])) {
+            error_log("total_balance field missing for: $email");
+            echo "<div class='alert alert-danger' role='alert'>
+                    <strong>System Error:</strong> Invalid account data.
+                  </div>";
+            break;
+        }
 
-                         if ($total_amount_with_reserve > $row['total_balance'])
-                              {
-                              echo"
-                         <div class='alert alert-danger' role='alert'>
-                          <strong> You do not have enough balance </strong> to do this transfer.
-                       </div>";  
-                               exit;
-                             }
+        $account_balance = floatval($row['total_balance']);
 
+        // FIX #9: Proper transaction fee handling
+        $transaction_fee = 3; // Fixed fee in currency units (should this be configurable?)
+        $total_amount_with_fee = $total_amount + $transaction_fee;
 
-                           /*
-                       if ($total_amount = $row['total_balance'])
-                              {
-                              echo"
-                         <div class='alert alert-info' role='alert'>
-                          <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
-                           <span aria-hidden='true'>&times;</span>
-                         </button>
-                          If all your money is transferred, <strong> your account will be zero. </strong>
-                       </div>"; 
-                             }
-                            */
+        // FIX #10: Comprehensive balance validation
+        if ($total_amount <= 0) {
+            echo "<div class='alert alert-danger' role='alert'>
+                    <strong>Error:</strong> Transfer amount must be greater than zero.
+                  </div>";
+            break;
+        }
 
+        if ($total_amount_with_fee > $account_balance) {
+            echo "<div class='alert alert-danger' role='alert'>
+                    <strong>Insufficient Balance:</strong> You do not have enough balance to complete this transfer.
+                    <br>Required: " . htmlspecialchars(number_format($total_amount_with_fee, 2), ENT_QUOTES, 'UTF-8') . " EUR
+                    <br>Available: " . htmlspecialchars(number_format($account_balance, 2), ENT_QUOTES, 'UTF-8') . " EUR
+                  </div>";
+            break;
+        }
 
+        // FIX #11: Optional warning if balance would be too low
+        $minimum_balance = 10; // Minimum balance to keep in account
+        $balance_after_transfer = $account_balance - $total_amount_with_fee;
 
-                          }  // end of while
+        if ($balance_after_transfer < $minimum_balance) {
+            echo "<div class='alert alert-warning' role='alert'>
+                    <strong>Warning:</strong> After this transfer, your balance will be low.
+                    <br>Balance after transfer: " . htmlspecialchars(number_format($balance_after_transfer, 2), ENT_QUOTES, 'UTF-8') . " EUR
+                  </div>";
+        }
 
+        // Balance is sufficient, allow transfer to proceed
+        // (other validation files will handle the rest)
 
+    } // end of while
 
+    $stmt->close();
+    $conn->close();
 
-                } // end of secure data input
-
-
-               } // end of else for connect
-
-
-
-            } // end of if for calss exists
-
-
-        } // end of if isset post transfer button
-
-
-    } // end of else session login
-
+} // end of if isset POST transfer button
 
 ?>
-

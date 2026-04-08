@@ -1,44 +1,90 @@
 <?php
 session_start();
 
+// Generate CSRF token if not exists
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 $error = '';
 $success = '';
 
 if($_SERVER['REQUEST_METHOD'] == 'POST'){
-    require_once('__SRC__/connect.php');
-    
-    $obj_conn = new DATABASE_CONNECT;
-    $conn = $obj_conn->get_connection();
-    
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $pin = md5($_POST['pin']);
-    
-    // Check if account exists, PIN matches, AND is active
-    $sql = "SELECT id, firstname, email, account_number, IBAN, is_active FROM customers WHERE email='$email' AND pin='$pin'";
-    $result = $conn->query($sql);
+    // Validate CSRF token
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        $error = "Security validation failed. Please try again.";
+    } else {
+        require_once('__SRC__/connect.php');
+        
+        $obj_conn = new DATABASE_CONNECT;
+        $conn = $obj_conn->get_connection();
+        
+        $email = filter_var($_POST['email'], FILTER_VALIDATE_EMAIL);
+        
+        if ($email === false) {
+            $error = "Invalid email format.";
+        } else {
+            // Use prepared statement to prevent SQL injection
+            $stmt = $conn->prepare("SELECT id, firstname, email, account_number, IBAN, is_active, pin FROM customers WHERE email = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
     
     if($result->num_rows > 0){
-        $row = $result->fetch_assoc();
-        
-        // Check if account is active
-        if($row['is_active'] == 1){
-            $_SESSION['user_id'] = $row['id'];
-            $_SESSION['user_email'] = $row['email'];
-            $_SESSION['user_name'] = $row['firstname'];
-            $_SESSION['account_number'] = $row['account_number'];
-            $_SESSION['IBAN'] = $row['IBAN'];
+                $row = $result->fetch_assoc();
+                
+                // Verify PIN using password_verify (supports both old md5 and new hash)
+                $pin_verified = false;
+                if (password_get_info($row['pin'])['algo'] !== 0) {
+                    // New hashed PIN
+                    $pin_verified = password_verify($_POST['pin'], $row['pin']);
+                } else {
+                    // Legacy MD5 PIN - upgrade on login
+                    $pin_verified = (md5($_POST['pin']) === $row['pin']);
+                }
+                
+                // Check if PIN matches AND account is active
+                if ($pin_verified) {
+                    if($row['is_active'] == 1){
+                        // Regenerate session ID to prevent session fixation
+                        session_regenerate_id(true);
+                        
+                        $_SESSION['user_id'] = $row['id'];
+                        $_SESSION['user_email'] = $row['email'];
+                        $_SESSION['user_name'] = $row['firstname'];
+                        $_SESSION['account_number'] = $row['account_number'];
+                        $_SESSION['IBAN'] = $row['IBAN'];
+                        $_SESSION['login'] = $row['email'];
+                        $_SESSION['timestamp'] = time();
+                        
+                        // Upgrade legacy MD5 PIN to secure hash
+                        if (password_get_info($row['pin'])['algo'] === 0) {
+                            $new_pin_hash = password_hash($_POST['pin'], PASSWORD_DEFAULT);
+                            $stmt_upgrade = $conn->prepare("UPDATE customers SET pin = ? WHERE email = ?");
+                            $stmt_upgrade->bind_param("ss", $new_pin_hash, $email);
+                            $stmt_upgrade->execute();
+                            $stmt_upgrade->close();
+                        }
+                        
+                        $stmt->close();
+                        $conn->close();
+                        header('Location: home.php');
+                        exit;
+                    } else {
+                        $error = "Your account is pending activation. Please wait for admin approval.";
+                    }
+                } else {
+                    $error = "Invalid email or PIN. Please try again.";
+                }
+            } else {
+                $error = "Invalid email or PIN. Please try again.";
+            }
             
-            $conn->close();
-            header('Location: customer-dashboard.php');
-            exit;
-        } else {
-            $error = "Your account is pending activation. Please wait for admin approval.";
+            $stmt->close();
         }
-    } else {
-        $error = "Invalid email or PIN. Please try again.";
+        
+        $conn->close();
     }
-    
-    $conn->close();
 }
 ?>
 
@@ -87,6 +133,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST'){
                 <?php endif; ?>
                 
                 <form method="POST" action="">
+                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                     <div class="form-group">
                         <label for="email">Email Address:</label>
                         <input type="email" class="form-control" id="email" name="email" 

@@ -1,6 +1,8 @@
 <?php
 session_start();
 
+require_once('__SRC__/csrf.php');
+
 /* ===============================
    SHOW ERRORS (VERY IMPORTANT)
 ================================= */
@@ -35,6 +37,7 @@ $SesClient = new SesClient([
    FORM SUBMIT
 ================================= */
 if(isset($_POST['submit_end'])) {
+    verify_csrf_token();
 
     if(!file_exists('__SRC__/secure_data.php')){
         die("secure_data.php missing");
@@ -66,13 +69,15 @@ if(isset($_POST['submit_end'])) {
     $first_name = $_SESSION['first_name'];
     $last_name  = $_SESSION['last_name'];
     $email      = $_SESSION['email'];
-    $password   = $_SESSION['password'];
+
+    $password_raw = $_SESSION['password'];
+    $password = password_hash($password_raw, PASSWORD_DEFAULT);
 
     $account_number = rand(1000000000,9999999999);
     $IBAN = "EB14".$account_number;
 
     $pin = rand(1000,9999);
-    $pin_hashed = md5($pin);
+    $pin_hashed = password_hash($pin, PASSWORD_DEFAULT);
 
     $ip_instant_register = $_SERVER['REMOTE_ADDR'];
 
@@ -92,24 +97,26 @@ if(isset($_POST['submit_end'])) {
         die("Database connection failed.");
     }
 
-    $sql = "INSERT INTO customers 
+    $stmt = $conn->prepare("INSERT INTO customers 
             (firstname, lastname, email, password, pin, account_number, IBAN, identity_back_name, identity_back_type, identity_back_size, identity_back_data, instant_register, ip_instant_register, is_active)
             VALUES
-            ('$first_name','$last_name','$email','$password','$pin_hashed','$account_number','$IBAN',
-             '$identity_back_name','$identity_back_type','$identity_back_size','$identity_back_data',
-             NOW(),'$ip_instant_register', 0)";
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 0)");
 
-    if(!$conn->query($sql)){
-        die("Database insert failed: " . $conn->error);
+    $stmt->bind_param("ssssisssiss",
+        $first_name, $last_name, $email, $password, $pin_hashed, $account_number, $IBAN,
+        $identity_back_name, $identity_back_type, $identity_back_size, $identity_back_data,
+        $ip_instant_register);
+
+    if(!$stmt->execute()){
+        die("Database insert failed: " . $stmt->error);
     }
-
+    $stmt->close();
     $conn->close();
 
     /* ===============================
        SEND EMAIL
     ================================= */
     try {
-
         $SesClient->sendEmail([
             'Destination' => ['ToAddresses' => [$email]],
             'Source' => 'ofiliyoungyz@gmail.com',
@@ -139,13 +146,11 @@ if(isset($_POST['submit_end'])) {
         unset($_SESSION['last_name']);
         unset($_SESSION['email']);
         unset($_SESSION['password']);
-        
-        // Redirect to PIN login page (NO ECHO BEFORE HEADER!)
+
         header('Location: page-login-pin.php');
         exit;
 
     } catch (AwsException $e) {
-        // Store error in session instead of echoing
         $_SESSION['error'] = "Email failed: " . $e->getMessage();
         header('Location: page-register.php');
         exit;
@@ -221,6 +226,8 @@ if(isset($_POST['submit_end'])) {
                 </div>
                 <div class="login-form" style="width: 550px; position: relative; left: 0%;">
                     <form action="" method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+
                         <h3 align="center">
                             <font color="black"><b><i>&dollar;&dollar; EASYBANK ACCOUNT &euro;&euro;</i></b></font>
                         </h3><hr>
