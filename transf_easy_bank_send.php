@@ -1,5 +1,4 @@
 <?php
-
 /*
  * Copyright (c) 2018 Barchampas Gerasimos <makindosx@gmail.com>
  * online-banking a online banking system for local businesses.
@@ -17,153 +16,137 @@
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
- *
  */
 
+session_start();
 
-   session_start();
+if (!isset($_SESSION['login'])) {
+    header('Location: index.php');
+    exit;
+}
 
-    
- if(!isset($_SESSION['login']))
-    {
-     header('Location: index.php');
-      }
-
-
-   else
-    {
-
-$idletime=898;//after 60 seconds the user gets logged out
-
-if (time()-$_SESSION['timestamp']>$idletime)
-   {
+// Session timeout (15 minutes)
+$idletime = 900;
+if (time() - $_SESSION['timestamp'] > $idletime) {
     session_destroy();
     session_unset();
-     }
+    header('Location: index.php');
+    exit;
+}
+$_SESSION['timestamp'] = time();
 
-  else
-    {
-    $_SESSION['timestamp']=time();
-     }
-
-
-
-  if (isset($_POST['transfer_easy_bank'])) 
-      {
-
-error_reporting(0);
-ini_set('display_errors', FALSE);
-
+if (isset($_POST['transfer_easy_bank'])) {
+    // Enable error logging
+    error_reporting(E_ALL);
+    ini_set('display_errors', FALSE);
+    ini_set('log_errors', TRUE);
 
     require_once('__SRC__/connect.php');
+    require_once('__SRC__/secure_db.php');
+    require_once('__SRC__/csrf.php');
 
+    // Verify CSRF token
+    verify_csrf_token();
 
-  if (class_exists('DATABASE_CONNECT'))
-       {
- 
-        $obj_conn  = new DATABASE_CONNECT;
-            
-        $conn = $obj_conn->get_connection();
-                 }
+    if (!class_exists('DATABASE_CONNECT')) {
+        die("Database connection class not found");
+    }
 
+    $obj_conn = new DATABASE_CONNECT;
+    $conn = $obj_conn->get_connection();
+    $db = new SECURE_DB($conn);
 
-         else
-           {
+    // Validate and sanitize input
+    $firstname = trim($_POST['firstname'] ?? '');
+    $lastname = trim($_POST['lastname'] ?? '');
+    $account_no = trim($_POST['account_no'] ?? '');
+    $main_amount = trim($_POST['main_amount'] ?? '0');
+    $secondary_amount = trim($_POST['secondary_amount'] ?? '0');
 
-          require_once('__SRC__/secure_data.php');
+    // Validate required fields
+    if (empty($firstname) || empty($lastname) || empty($account_no)) {
+        echo '<script type="text/javascript">alert("All fields are required.");</script>';
+        exit;
+    }
 
-          if (class_exists('SECURE_INPUT_DATA_AVAILABLE'))
-              {
+    // Validate amounts are numeric
+    if (!is_numeric($main_amount) || !is_numeric($secondary_amount)) {
+        echo '<script type="text/javascript">alert("Invalid amount format.");</script>';
+        exit;
+    }
 
-            $obj_secure_data = new SECURE_INPUT_DATA;
+    $total_amount = floatval($main_amount) + (floatval($secondary_amount) / 100);
 
+    if ($total_amount <= 0) {
+        echo '<script type="text/javascript">alert("Invalid transfer amount.");</script>';
+        exit;
+    }
 
-             // get personal details from user
+    // Get sender's balance using prepared statement
+    $sender_email = $_SESSION['login'];
+    $row = $db->fetchRow(
+        "SELECT total_balance FROM accounts WHERE email = ?",
+        [$sender_email]
+    );
 
-              $firstname          =   $obj_secure_data->SECURE_DATA_ENTER($_POST['firstname']);
-              $lastname           =   $obj_secure_data->SECURE_DATA_ENTER($_POST['lastname']);                 
-              $account_no         =   $obj_secure_data->SECURE_DATA_ENTER($_POST['account_no']);
-              $main_amount        =   $obj_secure_data->SECURE_DATA_ENTER($_POST['main_amount']);
-              $secondary_amount   =   $obj_secure_data->SECURE_DATA_ENTER($_POST['secondary_amount']);
-              $total_amount       =   $main_amount ."." .$secondary_amount;
-   
-   
-              
-              $sql = "select total_balance from accounts where email = '".$_SESSION['login']."' ";
-              $result  = $conn->query($sql);
- 
-                   while ($row = $result->fetch_assoc())
-                      {
+    if (!$row) {
+        echo '<script type="text/javascript">alert("Account not found.");</script>';
+        exit;
+    }
 
-                       $total_balance = $row['total_balance'];
-                      // $total_balance2 = number_format($total_balance, 2, '.', '');
-                       // echo $total_balance2;
+    $total_balance = floatval($row['total_balance']);
 
-                         if ($total_amount > $total_balance)
-                            { 
-            echo '<script type="text/javascript">alert("You do not have enough balance to do this transfer.");
-                </script>';
-                              }
+    if ($total_amount > $total_balance) {
+        echo '<script type="text/javascript">alert("You do not have enough balance to do this transfer.");</script>';
+        exit;
+    }
 
+    // Find recipient by name and account number
+    $recipient = $db->fetchRow(
+        "SELECT email FROM accounts WHERE firstname = ? AND lastname = ? AND account_no = ?",
+        [$firstname, $lastname, $account_no]
+    );
 
-                      else if ($total_amount <= $total_balance)
-                          {
+    if (!$recipient) {
+        echo '<script type="text/javascript">alert("Recipient account not found.");</script>';
+        exit;
+    }
 
-                 $sql2 = "update accounts set amounts_transferred = amounts_transferred + $total_amount,
-                          total_balance = total_balance - $total_amount
-                          where email = '".$_SESSION['login']."'";
-                 $result2  = $conn->query($sql2);
+    // Check for self-transfer
+    if ($recipient['email'] === $sender_email) {
+        echo '<script type="text/javascript">alert("Cannot transfer to your own account.");</script>';
+        exit;
+    }
 
+    // Start transaction
+    $conn->begin_transaction();
 
-                 $sql3 = "update accounts set amounts_from_others = amounts_from_others + $total_amount ,
-                          total_balance = total_balance + $total_amount
-                          where firstname = '$firstname' and lastname= '$lastname' and account_no = '$account_no' ";
-                 $result3  = $conn->query($sql3);
-                
+    try {
+        // Deduct from sender
+        $db->execute(
+            "UPDATE accounts SET amounts_transferred = amounts_transferred + ?, 
+             total_balance = total_balance - ? WHERE email = ?",
+            [$total_amount, $total_amount, $sender_email]
+        );
 
-                          //  if ($result2 == true && $result3 == true)
-                                // {
-                            
-                                 // }
-               
-                              } // end of else
+        // Add to recipient
+        $db->execute(
+            "UPDATE accounts SET amounts_from_others = amounts_from_others + ?, 
+             total_balance = total_balance + ? WHERE firstname = ? AND lastname = ? AND account_no = ?",
+            [$total_amount, $total_amount, $firstname, $lastname, $account_no]
+        );
 
+        // Commit transaction
+        $conn->commit();
 
-                           else
-                             {
-                              exit;
-                              }
-        
-     
-                       } // end of while
-             
+        echo '<script type="text/javascript">alert("Transfer completed successfully!"); location.href="transf_easy_bank.php";</script>';
+    } catch (Exception $e) {
+        // Rollback on error
+        $conn->rollback();
+        error_log("Transfer error: " . $e->getMessage());
+        echo '<script type="text/javascript">alert("Transfer failed. Please try again.");</script>';
+    }
 
-
-            
-        
-
-
-
-                   //else
-                    // { 
-                      //exit;
-                       //}
-
-
-
-                } // end of secure data input
-
-
-               } // end of else for connect
-
-
-
-            } // end of if for calss exists
-
-
-        } // end of if isset post transfer button
-
-
-    } // end of else session login
-
+    $conn->close();
+}
 ?>

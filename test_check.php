@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 /*
  * Copyright (c) 2018 Barchampas Gerasimos <makindosx@gmail.com>
@@ -46,61 +46,82 @@ $conn = $obj_conn->get_connection();
 
 $email = $_SESSION['login'];
 
-// ✅ Get account number and IBAN
-$stmt = $conn->prepare("SELECT account_no, IBAN FROM accounts WHERE email = ?");
+// âœ… Get user details
+$stmt_user = $conn->prepare("SELECT lastname, firstname FROM customers WHERE email = ?");
+$stmt_user->bind_param("s", $email);
+$stmt_user->execute();
+$result_user = $stmt_user->get_result();
+$row_user = $result_user->fetch_assoc();
+$stmt_user->close();
+
+$lastname  = ucfirst($row_user['lastname'] ?? '');
+$firstname = ucfirst($row_user['firstname'] ?? '');
+
+// âœ… Get notifications
+$stmt = $conn->prepare("SELECT id, created, lastname, firstname, title, message FROM notifications WHERE email = ?");
 $stmt->bind_param("s", $email);
 $stmt->execute();
-$result = $stmt->get_result();
-$row = $result->fetch_assoc();
+$result_notifications = $stmt->get_result();
 $stmt->close();
 
-$account_no = $row['account_no'] ?? '';
-$IBAN       = $row['IBAN'] ?? '';
+$notifications = [];
+while ($row = $result_notifications->fetch_assoc()) {
+    $notifications[] = $row;
+}
 
-// ✅ Get easy bank transactions by month — using aliases
-$stmt2 = $conn->prepare("SELECT COUNT(transaction_number) AS cnt, MONTH(date_transfer) AS month_num
-                         FROM transactions_easy_bank
-                         WHERE _from_customer_account_no = ?
-                         GROUP BY MONTH(date_transfer)");
-$stmt2->bind_param("s", $account_no);
+// âœ… Get balance and account statement
+$stmt2 = $conn->prepare("SELECT total_balance, account_statement FROM accounts WHERE email = ?");
+$stmt2->bind_param("s", $email);
 $stmt2->execute();
 $result2 = $stmt2->get_result();
+$row2 = $result2->fetch_assoc();
 $stmt2->close();
 
-// ✅ Get anyone bank transactions by month — using aliases
-$stmt3 = $conn->prepare("SELECT COUNT(transaction_number) AS cnt, MONTH(date_transfer) AS month_num
-                         FROM transactions_anyone_bank
-                         WHERE _from_customer_IBAN = ?
-                         GROUP BY MONTH(date_transfer)");
-$stmt3->bind_param("s", $IBAN);
+$balance           = $row2['total_balance'] ?? 0;
+$account_statement = $row2['account_statement'] ?? '';
+
+// âœ… Get account number and IBAN
+$stmt3 = $conn->prepare("SELECT account_no, IBAN FROM accounts WHERE email = ?");
+$stmt3->bind_param("s", $email);
 $stmt3->execute();
 $result3 = $stmt3->get_result();
+$row3 = $result3->fetch_assoc();
 $stmt3->close();
 
+$account_no = $row3['account_no'] ?? '';
+$IBAN       = $row3['IBAN'] ?? '';
+
+// âœ… Get transfer counts
+$stmt4 = $conn->prepare("SELECT COUNT(_from_customer_account_no) AS cnt FROM transactions_easy_bank WHERE _from_customer_account_no = ?");
+$stmt4->bind_param("s", $account_no);
+$stmt4->execute();
+$row4 = $stmt4->get_result()->fetch_assoc();
+$stmt4->close();
+
+$stmt5 = $conn->prepare("SELECT COUNT(_from_customer_IBAN) AS cnt FROM transactions_anyone_bank WHERE _from_customer_IBAN = ?");
+$stmt5->bind_param("s", $IBAN);
+$stmt5->execute();
+$row5 = $stmt5->get_result()->fetch_assoc();
+$stmt5->close();
+
+$all_transfers = ($row4['cnt'] ?? 0) + ($row5['cnt'] ?? 0);
+
+// âœ… Get transaction counts
+$stmt6 = $conn->prepare("SELECT COUNT(_from_customer_account_no) AS cnt FROM transactions_easy_bank WHERE _from_customer_account_no = ? OR _to_customer_account_no = ?");
+$stmt6->bind_param("ss", $account_no, $account_no);
+$stmt6->execute();
+$row6 = $stmt6->get_result()->fetch_assoc();
+$stmt6->close();
+
+$stmt7 = $conn->prepare("SELECT COUNT(_from_customer_IBAN) AS cnt FROM transactions_anyone_bank WHERE _from_customer_IBAN = ? OR _to_customer_IBAN = ?");
+$stmt7->bind_param("ss", $IBAN, $IBAN);
+$stmt7->execute();
+$row7 = $stmt7->get_result()->fetch_assoc();
+$stmt7->close();
+
+$all_transactions = ($row6['cnt'] ?? 0) + ($row7['cnt'] ?? 0);
+
 $conn->close();
-
-// Initialize monthly arrays
-$months = ['january','february','march','april','may','june',
-           'july','august','september','october','november','december'];
-
-$easy_bank = array_fill_keys($months, 0);
-$anyone_bank = array_fill_keys($months, 0);
-
-// Fill easy bank monthly data
-while ($row2 = $result2->fetch_assoc()) {
-    $month_index = $row2['month_num'] - 1;
-    if (isset($months[$month_index])) {
-        $easy_bank[$months[$month_index]] = (int)$row2['cnt'];
-    }
-}
-
-// Fill anyone bank monthly data
-while ($row3 = $result3->fetch_assoc()) {
-    $month_index = $row3['month_num'] - 1;
-    if (isset($months[$month_index])) {
-        $anyone_bank[$months[$month_index]] = (int)$row3['cnt'];
-    }
-}
 ?>
 
 <!doctype html>
@@ -109,6 +130,7 @@ while ($row3 = $result3->fetch_assoc()) {
 <!--[if IE 8]>         <html class="no-js lt-ie9" lang=""> <![endif]-->
 <!--[if gt IE 8]><!--> <html class="no-js" lang=""> <!--<![endif]-->
 <head>
+    <meta HTTP-EQUIV="REFRESH" content="900; url=/logout.php">
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Easybank</title>
@@ -121,6 +143,7 @@ while ($row3 = $result3->fetch_assoc()) {
     <link rel="stylesheet" href="assets/css/flag-icon.min.css">
     <link rel="stylesheet" href="assets/css/cs-skin-elastic.css">
     <link rel="stylesheet" href="assets/scss/style.css">
+    <link href="assets/css/lib/vector-map/jqvmap.min.css" rel="stylesheet">
     <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,600,700,800' rel='stylesheet' type='text/css'>
 
     <script>
@@ -279,64 +302,99 @@ while ($row3 = $result3->fetch_assoc()) {
             </div>
         </header>
 
-        <!-- Chart -->
+        <!-- Breadcrumbs -->
         <div class="breadcrumbs">
-            <div class="content mt-3">
-                <div class="animated fadeIn">
+            <div class="col-sm-4">
+                <div class="page-header float-left">
+                    <div class="page-title">
+                        <h1>Welcome <b><?= htmlspecialchars($lastname) ?> <?= htmlspecialchars($firstname) ?></b></h1>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-                    <script type="text/javascript">
-                    google.charts.load('current', {'packages': ['bar']});
-                    google.charts.setOnLoadCallback(drawStuff);
-
-                    function drawStuff() {
-                        var data = new google.visualization.arrayToDataTable([
-                            ['Your Transactions', 'Easy Bank', 'Anyone Bank'],
-                            ['Full Transactions', 30000, 30],
-                            ['January',   <?= $easy_bank['january'] * 1000 ?>,   <?= $anyone_bank['january'] ?>],
-                            ['February',  <?= $easy_bank['february'] * 1000 ?>,  <?= $anyone_bank['february'] ?>],
-                            ['March',     <?= $easy_bank['march'] * 1000 ?>,     <?= $anyone_bank['march'] ?>],
-                            ['April',     <?= $easy_bank['april'] * 1000 ?>,     <?= $anyone_bank['april'] ?>],
-                            ['May',       <?= $easy_bank['may'] * 1000 ?>,       <?= $anyone_bank['may'] ?>],
-                            ['June',      <?= $easy_bank['june'] * 1000 ?>,      <?= $anyone_bank['june'] ?>],
-                            ['July',      <?= $easy_bank['july'] * 1000 ?>,      <?= $anyone_bank['july'] ?>],
-                            ['August',    <?= $easy_bank['august'] * 1000 ?>,    <?= $anyone_bank['august'] ?>],
-                            ['September', <?= $easy_bank['september'] * 1000 ?>, <?= $anyone_bank['september'] ?>],
-                            ['October',   <?= $easy_bank['october'] * 1000 ?>,   <?= $anyone_bank['october'] ?>],
-                            ['November',  <?= $easy_bank['november'] * 1000 ?>,  <?= $anyone_bank['november'] ?>],
-                            ['December',  <?= $easy_bank['december'] * 1000 ?>,  <?= $anyone_bank['december'] ?>]
-                        ]);
-
-                        var options = {
-                            width: 1100,
-                            height: 600,
-                            chart: { title: '', subtitle: '' },
-                            bars: 'horizontal',
-                            series: {
-                                0: { axis: 'distance' },
-                                1: { axis: 'brightness' }
-                            },
-                            axes: {
-                                x: {
-                                    distance:   { label: 'parsecs' },
-                                    brightness: { side: 'top', label: 'apparent magnitude' }
-                                }
-                            }
-                        };
-
-                        var chart = new google.charts.Bar(document.getElementById('dual_x_div'));
-                        chart.draw(data, options);
-                    }
-                    </script>
-
-                    <div class="card-body" style="border:0;" align="center">
-                        <h4 class="mb-3">Your Transactions Chart</h4>
-                        <div class="flot-container">
-                            <div id="dual_x_div" class="flot-pie-container"></div>
+        <!-- Notifications Table -->
+        <div class="container-fluid">
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-12 col-sm-12 col-md-3">
+                            <h2 class="text-center pull-left" style="padding-left:30px;">
+                                <i class="menu-icon fa fa-bell"></i> Notifications
+                            </h2>
                         </div>
                     </div>
-
                 </div>
+
+                <div class="panel-body table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th class="text-center">Date</th>
+                                <th class="text-center">Lastname</th>
+                                <th class="text-center">Firstname</th>
+                                <th class="text-center">Title</th>
+                                <th class="text-center">Notice</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($notifications as $row): ?>
+                            <tr class="edit" id="detail">
+                                <td class="text-center"><?= htmlspecialchars($row['created']) ?></td>
+                                <td class="text-center"><?= htmlspecialchars($row['lastname']) ?></td>
+                                <td class="text-center"><?= htmlspecialchars($row['firstname']) ?></td>
+                                <td class="text-center"><?= htmlspecialchars($row['title']) ?></td>
+                                <td class="text-center"><?= htmlspecialchars($row['message']) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <br><br>
+
+        <!-- Stats Cards -->
+        <div align="center">
+            <div class="col-xl-3 col-lg-6">
+                <div class="card"><div class="card-body"><div class="stat-widget-one">
+                    <div class="stat-icon dib"><i class="fa fa-euro text-success border-success"></i></div>
+                    <div class="stat-content dib">
+                        <div class="stat-text">Your balance</div>
+                        <div class="stat-digit"><?= htmlspecialchars($balance) ?></div>
+                    </div>
+                </div></div></div>
+            </div>
+
+            <div class="col-xl-3 col-lg-6">
+                <div class="card"><div class="card-body"><div class="stat-widget-one">
+                    <div class="stat-icon dib"><i class="ti-user text-primary border-primary"></i></div>
+                    <div class="stat-content dib">
+                        <div class="stat-text">Your account</div>
+                        <div class="stat-digit"><?= htmlspecialchars($account_statement) ?></div>
+                    </div>
+                </div></div></div>
+            </div>
+
+            <div class="col-xl-3 col-lg-6">
+                <div class="card"><div class="card-body"><div class="stat-widget-one">
+                    <div class="stat-icon dib"><i class="fa fa-handshake-o text-warning border-warning"></i></div>
+                    <div class="stat-content dib">
+                        <div class="stat-text">Transactions</div>
+                        <div class="stat-digit"><?= htmlspecialchars($all_transactions) ?></div>
+                    </div>
+                </div></div></div>
+            </div>
+
+            <div class="col-xl-3 col-lg-6">
+                <div class="card"><div class="card-body"><div class="stat-widget-one">
+                    <div class="stat-icon dib"><i class="fa fa-credit-card-alt text-warning border-warning"></i></div>
+                    <div class="stat-content dib">
+                        <div class="stat-text">Transfers</div>
+                        <div class="stat-digit"><?= htmlspecialchars($all_transfers) ?></div>
+                    </div>
+                </div></div></div>
             </div>
         </div>
 

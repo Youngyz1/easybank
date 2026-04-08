@@ -18,8 +18,83 @@
  */
 session_start();
 
-// ✅ Load CSRF helper
 require_once('__SRC__/csrf.php');
+
+error_reporting(0);
+ini_set('display_errors', FALSE);
+
+if (isset($_POST['submit_login'])) {
+    verify_csrf_token();
+
+    require_once('__SRC__/secure_data.php');
+
+    if (class_exists('SECURE_INPUT_DATA_AVAILABLE')) {
+        $obj_secure_data = new SECURE_INPUT_DATA;
+
+        $email    = $obj_secure_data->SECURE_DATA_ENTER($_POST['email']);
+        $password = $obj_secure_data->SECURE_DATA_ENTER($_POST['password']);
+        $pin      = preg_replace('/[^0-9]/', '', $_POST['pin']);
+
+        require_once('__SRC__/connect.php');
+
+        if (class_exists('DATABASE_CONNECT')) {
+            $obj_conn = new DATABASE_CONNECT;
+            $conn     = $obj_conn->get_connection();
+
+            $email          = $conn->real_escape_string($email);
+            $password_input = $conn->real_escape_string($password);
+            $pin_plain      = $conn->real_escape_string($pin);
+
+            $sql    = "SELECT email, password, pin, is_active FROM customers WHERE email='$email'";
+            $result = $conn->query($sql);
+
+            if ($result && $result->num_rows == 1) {
+                $row = $result->fetch_assoc();
+
+                if ($row['is_active'] != 1) {
+                    echo "<div class='alert alert-danger' role='alert'>
+                            <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
+                                <span aria-hidden='true'>&times;</span>
+                            </button>
+                            <strong>Your account is not activated.</strong>
+                          </div>";
+                } elseif (!password_verify($password_input, $row['password']) && $row['password'] != md5($password_input)) {
+                    echo "<div class='alert alert-danger' role='alert'>
+                            <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
+                                <span aria-hidden='true'>&times;</span>
+                            </button>
+                            <strong>Your login password is invalid.</strong>
+                          </div>";
+                } elseif (!password_verify($pin_plain, $row['pin']) && $row['pin'] != md5($pin_plain)) {
+                    echo "<div class='alert alert-danger' role='alert'>
+                            <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
+                                <span aria-hidden='true'>&times;</span>
+                            </button>
+                            <strong>Your login PIN is invalid.</strong>
+                          </div>";
+                } else {
+                    session_regenerate_id(true);
+
+                    $_SESSION['login']     = $email;
+                    $_SESSION['timestamp'] = time();
+
+                    unset($_SESSION['csrf_token']);
+
+                    echo "<script>location.href='home.php'</script>";
+                }
+            } else {
+                echo "<div class='alert alert-danger' role='alert'>
+                        <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
+                            <span aria-hidden='true'>&times;</span>
+                        </button>
+                        <strong>Email not found.</strong>
+                      </div>";
+            }
+
+            $conn->close();
+        }
+    }
+}
 ?>
 
 <!doctype html>
@@ -29,12 +104,10 @@ require_once('__SRC__/csrf.php');
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Easybank</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <link rel="shortcut icon" href="favicon.png" type="image/png">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-
     <link rel="stylesheet" href="assets/css/normalize.css">
     <link rel="stylesheet" href="assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="assets/css/font-awesome.min.css">
@@ -70,7 +143,6 @@ require_once('__SRC__/csrf.php');
                     </h3>
                     <hr>
 
-                    <!-- ✅ Real PHP CSRF token -->
                     <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
 
                     <div class="form-group">
@@ -126,85 +198,3 @@ require_once('__SRC__/csrf.php');
 
 </body>
 </html>
-
-<?php
-error_reporting(0);
-ini_set('display_errors', FALSE);
-
-if (isset($_POST['submit_login'])) {
-
-    // ✅ Verify CSRF token before processing anything
-    verify_csrf_token();
-
-    require_once('__SRC__/secure_data.php');
-
-    if (class_exists('SECURE_INPUT_DATA_AVAILABLE')) {
-        $obj_secure_data = new SECURE_INPUT_DATA;
-
-        $email    = $obj_secure_data->SECURE_DATA_ENTER($_POST['email']);
-        $password = $obj_secure_data->SECURE_DATA_ENTER($_POST['password']);
-        $pin      = preg_replace('/[^0-9]/', '', $_POST['pin']);
-
-        require_once('__SRC__/connect.php');
-
-        if (class_exists('DATABASE_CONNECT')) {
-            $obj_conn = new DATABASE_CONNECT;
-            $conn     = $obj_conn->get_connection();
-
-            $email           = $conn->real_escape_string($email);
-            $password_hashed = md5($conn->real_escape_string($password));
-            $pin_plain       = $conn->real_escape_string($pin);
-
-            $sql    = "SELECT email, password, pin, is_active FROM customers WHERE email='$email'";
-            $result = $conn->query($sql);
-
-            if ($result && $result->num_rows == 1) {
-                $row = $result->fetch_assoc();
-
-                if ($row['is_active'] != 1) {
-                    echo "<div class='alert alert-danger' role='alert'>
-                            <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
-                                <span aria-hidden='true'>&times;</span>
-                            </button>
-                            <strong>Your account is not activated.</strong>
-                          </div>";
-                } elseif ($row['password'] != $password_hashed) {
-                    echo "<div class='alert alert-danger' role='alert'>
-                            <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
-                                <span aria-hidden='true'>&times;</span>
-                            </button>
-                            <strong>Your login password is invalid.</strong>
-                          </div>";
-                } elseif ($row['pin'] != md5($pin_plain)) {
-                    echo "<div class='alert alert-danger' role='alert'>
-                            <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
-                                <span aria-hidden='true'>&times;</span>
-                            </button>
-                            <strong>Your login PIN is invalid.</strong>
-                          </div>";
-                } else {
-                    // ✅ Regenerate session ID on successful login — prevents session fixation
-                    session_regenerate_id(true);
-
-                    $_SESSION['login']     = $email;
-                    $_SESSION['timestamp'] = time();
-
-                    // ✅ Regenerate CSRF token after login for a fresh session
-                    unset($_SESSION['csrf_token']);
-
-                    echo "<script>location.href='home.php'</script>";
-                }
-            } else {
-                echo "<div class='alert alert-danger' role='alert'>
-                        <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
-                            <span aria-hidden='true'>&times;</span>
-                        </button>
-                        <strong>Email not found.</strong>
-                      </div>";
-            }
-
-            $conn->close();
-        }
-    }
-}
-?>

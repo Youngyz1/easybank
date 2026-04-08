@@ -14,24 +14,41 @@ $conn = $obj_conn->get_connection();
 
 $message = '';
 
+// Generate CSRF token if not exists
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// Validate CSRF token for any action
+$csrf_valid = false;
+if (isset($_GET['activate']) || isset($_GET['deactivate'])) {
+    if (isset($_GET['csrf_token']) && hash_equals($_SESSION['csrf_token'], $_GET['csrf_token'])) {
+        $csrf_valid = true;
+    }
+}
+
 // Activate user if requested
-if(isset($_GET['activate'])){
-    $user_id = mysqli_real_escape_string($conn, $_GET['activate']);
-    $update_sql = "UPDATE customers SET is_active = 1, account_type = 'active' WHERE id = '$user_id'";
-    if($conn->query($update_sql)){
+if(isset($_GET['activate']) && $csrf_valid){
+    $user_id = intval($_GET['activate']); // Sanitize as integer
+    $stmt = $conn->prepare("UPDATE customers SET is_active = 1, account_type = 'active' WHERE id = ?");
+    $stmt->bind_param("i", $user_id);
+    if($stmt->execute()){
         $message = '<div class="alert alert-success">User activated successfully!</div>';
     } else {
         $message = '<div class="alert alert-danger">Error activating user!</div>';
     }
+    $stmt->close();
 }
 
 // Deactivate user if requested
-if(isset($_GET['deactivate'])){
-    $user_id = mysqli_real_escape_string($conn, $_GET['deactivate']);
-    $update_sql = "UPDATE customers SET is_active = 0, account_type = 'inactive' WHERE id = '$user_id'";
-    if($conn->query($update_sql)){
+if(isset($_GET['deactivate']) && $csrf_valid){
+    $user_id = intval($_GET['deactivate']); // Sanitize as integer
+    $stmt = $conn->prepare("UPDATE customers SET is_active = 0, account_type = 'inactive' WHERE id = ?");
+    $stmt->bind_param("i", $user_id);
+    if($stmt->execute()){
         $message = '<div class="alert alert-warning">User deactivated!</div>';
     }
+    $stmt->close();
 }
 
 // Get all inactive users
@@ -102,7 +119,7 @@ $result = $conn->query($sql);
                             <td><?php echo htmlspecialchars($row['email']); ?></td>
                             <td><?php echo htmlspecialchars($row['instant_register']); ?></td>
                             <td>
-                                <a href="?activate=<?php echo $row['id']; ?>" class="btn btn-success btn-sm">
+                                <a href="?activate=<?php echo $row['id']; ?>&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-success btn-sm">
                                     <i class="glyphicon glyphicon-ok"></i> Activate
                                 </a>
                             </td>
@@ -147,7 +164,7 @@ $result = $conn->query($sql);
                             <td><?php echo htmlspecialchars($row['email']); ?></td>
                             <td><?php echo htmlspecialchars($row['instant_register']); ?></td>
                             <td>
-                                <a href="?deactivate=<?php echo $row['id']; ?>" class="btn btn-danger btn-sm" onclick="return confirm('Deactivate this user?');">
+                                <a href="?deactivate=<?php echo $row['id']; ?>&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-danger btn-sm" onclick="return confirm('Deactivate this user?');">
                                     <i class="glyphicon glyphicon-remove"></i> Deactivate
                                 </a>
                             </td>

@@ -27,15 +27,18 @@
  if(!isset($_SESSION['login']))
     {
      header('Location: index.php');
+     exit;
       }
 
 
-$idletime=898;//after 60 seconds the user gets logged out
+$idletime=900;//after 15 minutes the user gets logged out
 
 if (time()-$_SESSION['timestamp']>$idletime)
    {
     session_destroy();
     session_unset();
+    header('Location: index.php');
+    exit;
      }
 
   else

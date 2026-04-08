@@ -26,18 +26,21 @@
  if(!isset($_SESSION['login']))
     {
      header('Location: index.php');
+     exit;
       }
 
 
    else
     {
 
-$idletime=898;//after 60 seconds the user gets logged out
+$idletime=900;//after 15 minutes the user gets logged out
 
 if (time()-$_SESSION['timestamp']>$idletime)
    {
     session_destroy();
     session_unset();
+    header('Location: index.php');
+    exit;
      }
 
   else
@@ -76,13 +79,16 @@ if (time()-$_SESSION['timestamp']>$idletime)
             $secondary_amount  =   $obj_secure_data->SECURE_DATA_ENTER($_POST['secondary_amount']);
             $total_amount      =   $main_amount .'.' .$secondary_amount;
 
+            $email = $_SESSION['login'];
+
+        $stmt = $conn->prepare("SELECT total_balance FROM accounts WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
 
 
-        $sql = "select total_balance from accounts where  email = '".$_SESSION['login']."' ";
-        $result = $conn->query($sql);
-
-
-                  while  ($row = $result->fetch_assoc())
+                  $row = $result->fetch_assoc();
+                  $stmt->close();
                             {
                        
                          if ($total_amount > $row['total_balance'])
@@ -126,10 +132,6 @@ if (time()-$_SESSION['timestamp']>$idletime)
 
 
         } // end of if isset post transfer button
-
-
-    } // end of else session login
-
 
 ?>
 

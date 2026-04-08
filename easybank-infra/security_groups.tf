@@ -101,12 +101,16 @@ resource "aws_security_group_rule" "app_to_rds" {
 }
 
 # GitHub Actions → RDS (for CI/CD pipeline)
+# NOTE: For production, use AWS Secrets Manager or Parameter Store instead of direct DB access
+# This rule allows access from GitHub Actions IP ranges - update with actual GitHub IPs
 resource "aws_security_group_rule" "github_to_rds" {
   type              = "ingress"
   from_port         = 3306
   to_port           = 3306
   protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]  # Allow from anywhere for CI/CD
+  # Use specific GitHub Actions IP ranges: https://api.github.com/meta
+  # For better security, use AWS Systems Manager Parameter Store or Secrets Manager instead
+  cidr_blocks       = ["13.236.0.0/14", "18.184.0.0/15", "52.74.0.0/16", "54.251.0.0/16", "54.255.0.0/16", "13.210.0.0/15", "52.64.0.0/17"]
   security_group_id = aws_security_group.rds_sg.id
-  description       = "Allow MySQL from GitHub Actions"
+  description       = "Allow MySQL from GitHub Actions (limited IP range)"
 }
